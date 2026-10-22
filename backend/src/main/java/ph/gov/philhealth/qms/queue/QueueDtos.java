@@ -34,7 +34,26 @@ public final class QueueDtos {
     public record TicketDetail(@JsonUnwrapped TicketDto ticket, List<TicketEventDto> events) {
     }
 
-    public record IssuedTicket(@JsonUnwrapped TicketDto ticket, String siteName, long waitingAhead, int estimatedWaitMinutes) {
+    /** publicToken opens the client's phone view (/t/{token}); it is returned only in this response. */
+    public record IssuedTicket(@JsonUnwrapped TicketDto ticket, String siteName, long waitingAhead, int estimatedWaitMinutes,
+                               String publicToken) {
+        public IssuedTicket withPublicToken(String token) {
+            return new IssuedTicket(ticket, siteName, waitingAhead, estimatedWaitMinutes, token);
+        }
+    }
+
+    /** What a client sees on their phone. Holds no personal data; the ticket id is not exposed. */
+    public record PublicTicketStatus(String displayNumber, String serviceName, String siteName, TicketStatus status,
+                                     long waitingAhead, int estimatedWaitMinutes, String counterName,
+                                     Instant issuedAt, Instant lastCalledAt, boolean feedbackOpen,
+                                     boolean feedbackGiven) {
+    }
+
+    /** Today's completed ticket a client can rate at the kiosk. */
+    public record FeedbackTicket(UUID ticketId, String displayNumber, String serviceName) {
+    }
+
+    public record PublicFeedbackRequest(@Min(1) @Max(5) int rating, @Size(max = 1000) String comment) {
     }
 
     public record AgentSessionDto(UUID id, UUID counterId, String counterName, UUID siteId,
@@ -95,8 +114,9 @@ public final class QueueDtos {
     public record KioskPriority(UUID id, String code, String name, String description) {
     }
 
+    /** ticketLinkBaseUrl: origin for phone e-ticket links in QR codes; null means the kiosk's own origin. */
     public record KioskConfig(SiteRef site, List<KioskService> services, List<KioskPriority> priorityCategories,
-                              List<ContentDto> content) {
+                              List<ContentDto> content, String ticketLinkBaseUrl) {
     }
 
     // ------------------------------------------------------------------ requests

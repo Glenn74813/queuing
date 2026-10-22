@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import ph.gov.philhealth.qms.catalog.CatalogDtos.AddCatalogServicesRequest;
 import ph.gov.philhealth.qms.catalog.CatalogDtos.PriorityCategoryDto;
 import ph.gov.philhealth.qms.catalog.CatalogDtos.PriorityCategoryInput;
 import ph.gov.philhealth.qms.catalog.CatalogDtos.ServiceItemDto;
@@ -59,6 +60,14 @@ public class CatalogController {
     @PreAuthorize("hasAuthority('SITE_SERVICE_MANAGE')")
     public SiteServiceDto createSiteService(@PathVariable UUID siteId, @Valid @RequestBody SiteServiceInput in) {
         return service.createSiteService(siteId, in);
+    }
+
+    /** Adds catalog services the site does not offer yet: all active ones, or those listed. */
+    @PostMapping("/sites/{siteId}/services/add-catalog")
+    @PreAuthorize("hasAuthority('SITE_SERVICE_MANAGE')")
+    public List<SiteServiceDto> addCatalogServices(@PathVariable UUID siteId,
+                                                   @RequestBody(required = false) AddCatalogServicesRequest in) {
+        return service.addCatalogServices(siteId, in != null ? in.serviceItemIds() : null);
     }
 
     @PutMapping("/sites/{siteId}/services/{id}")

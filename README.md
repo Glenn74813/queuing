@@ -8,7 +8,7 @@ national administration and reporting.
 > compliant.**
 >
 > * The core queue engine, security model, kiosk/display/agent/admin UIs, reporting and the
->   synchronization pipeline are built, with 52 backend, 59 frontend and 14 browser end-to-end tests passing.
+>   synchronization pipeline are built, with 60 backend, 65 frontend and 15 browser end-to-end tests passing.
 > * Many procurement items depend on PhilHealth decisions or hardware. See
 >   [docs/open-issues.md](docs/open-issues.md) and the
 >   [requirements traceability matrix](docs/requirements-traceability-matrix.md).

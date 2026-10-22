@@ -1,5 +1,6 @@
 package ph.gov.philhealth.qms.security;
 
+import java.time.Instant;
 import java.util.EnumSet;
 import java.util.Optional;
 import java.util.UUID;
@@ -7,15 +8,24 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import ph.gov.philhealth.qms.user.AppUser;
 import ph.gov.philhealth.qms.user.AppUserRepository;
+import ph.gov.philhealth.qms.user.RefreshTokenRepository;
 import ph.gov.philhealth.qms.user.RoleAssignment;
 
 @Component
 public class AuthUserLoader {
 
     private final AppUserRepository users;
+    private final RefreshTokenRepository refreshTokens;
 
-    public AuthUserLoader(AppUserRepository users) {
+    public AuthUserLoader(AppUserRepository users, RefreshTokenRepository refreshTokens) {
         this.users = users;
+        this.refreshTokens = refreshTokens;
+    }
+
+    /** True while the sign-in session still has an unrevoked, unexpired refresh token. */
+    @Transactional(readOnly = true)
+    public boolean sessionLive(UUID sessionId) {
+        return refreshTokens.existsBySessionIdAndRevokedAtIsNullAndExpiresAtAfter(sessionId, Instant.now());
     }
 
     /** Loads an active user with grants; empty when the user is missing, suspended or deactivated. */

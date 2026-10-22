@@ -8,6 +8,7 @@ import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.List;
 import java.util.UUID;
 
 public final class CatalogDtos {
@@ -62,6 +63,10 @@ public final class CatalogDtos {
                     s.getSortOrder(), s.getEstimatedDurationMinutes(), s.getOpenTime(), s.getCloseTime(),
                     s.getNextSiteServiceId());
         }
+    }
+
+    /** serviceItemIds: null or empty adds every active catalog service. */
+    public record AddCatalogServicesRequest(List<UUID> serviceItemIds) {
     }
 
     public record SiteServiceInput(@NotNull UUID serviceItemId,

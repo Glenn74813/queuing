@@ -130,6 +130,72 @@ public class CatalogService {
         return SiteServiceDto.of(s);
     }
 
+    /**
+     * Offers every active catalog service the site does not have yet, or only {@code itemIds} when given.
+     * Each keeps its catalog prefix and duration; a prefix already used at the site is replaced by the
+     * first free one (A–Z, then AA, AB, …). New services go after the existing ones, in catalog order.
+     */
+    @Transactional
+    public List<SiteServiceDto> addCatalogServices(UUID siteId, List<UUID> itemIds) {
+        scope.requireSite(Permission.SITE_SERVICE_MANAGE, siteId);
+        List<SiteService> existing = siteServices.findBySiteIdOrderBySortOrderAsc(siteId);
+        java.util.Set<UUID> offered = new java.util.HashSet<>();
+        java.util.Set<String> prefixes = new java.util.HashSet<>();
+        int order = 0;
+        for (SiteService s : existing) {
+            offered.add(s.getServiceItem().getId());
+            prefixes.add(s.getPrefix());
+            order = Math.max(order, s.getSortOrder());
+        }
+        java.time.LocalDate today = java.time.LocalDate.now();
+        List<SiteServiceDto> created = new java.util.ArrayList<>();
+        for (ServiceItem item : items.findAllByOrderBySortOrderAscCodeAsc()) {
+            boolean wanted = itemIds == null || itemIds.isEmpty() ? item.isActive()
+                    && (item.getEffectiveTo() == null || !item.getEffectiveTo().isBefore(today))
+                    : itemIds.contains(item.getId());
+            if (!wanted || offered.contains(item.getId())) {
+                continue;
+            }
+            String prefix = item.getDefaultPrefix() != null && item.getDefaultPrefix().matches("^[A-Z]{1,3}$")
+                    && !prefixes.contains(item.getDefaultPrefix()) ? item.getDefaultPrefix() : freePrefix(prefixes);
+            prefixes.add(prefix);
+            SiteService s = new SiteService();
+            s.setSiteId(siteId);
+            s.setServiceItem(item);
+            s.setPrefix(prefix);
+            s.setActive(true);
+            s.setSortOrder(++order);
+            s.setEstimatedDurationMinutes(Math.max(1, item.getDefaultDurationMinutes()));
+            siteServices.save(s);
+            outbox.enqueue("SITE_SERVICE_UPSERT", "SiteService", s.getId().toString(), Snapshots.of(s));
+            created.add(SiteServiceDto.of(s));
+        }
+        siteServices.flush();
+        if (!created.isEmpty()) {
+            audit.record("SITE_SERVICES_ADDED", "Site", siteId, siteId, created.size() + " catalog services: "
+                    + created.stream().map(d -> d.prefix() + " " + d.serviceCode())
+                    .collect(java.util.stream.Collectors.joining(", ")));
+        }
+        return created;
+    }
+
+    private static String freePrefix(java.util.Set<String> used) {
+        for (char a = 'A'; a <= 'Z'; a++) {
+            if (!used.contains(String.valueOf(a))) {
+                return String.valueOf(a);
+            }
+        }
+        for (char a = 'A'; a <= 'Z'; a++) {
+            for (char b = 'A'; b <= 'Z'; b++) {
+                String p = "" + a + b;
+                if (!used.contains(p)) {
+                    return p;
+                }
+            }
+        }
+        throw ApiException.conflict("No free ticket prefix left at this site");
+    }
+
     @Transactional
     public SiteServiceDto updateSiteService(UUID siteId, UUID id, SiteServiceInput in) {
         scope.requireSite(Permission.SITE_SERVICE_MANAGE, siteId);

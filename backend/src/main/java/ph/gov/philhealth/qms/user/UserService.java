@@ -22,6 +22,7 @@ import ph.gov.philhealth.qms.security.CurrentUser;
 import ph.gov.philhealth.qms.security.Permission;
 import ph.gov.philhealth.qms.security.ScopeService;
 import ph.gov.philhealth.qms.security.ScopeType;
+import ph.gov.philhealth.qms.user.UserDtos.SessionDto;
 import ph.gov.philhealth.qms.user.UserDtos.AssignmentInput;
 import ph.gov.philhealth.qms.user.UserDtos.CreateUserRequest;
 import ph.gov.philhealth.qms.user.UserDtos.RoleDto;
@@ -161,6 +162,31 @@ public class UserService {
         u.setLockedUntil(null);
         refreshTokens.revokeAllForUser(u.getId(), Instant.now(), "REVOKED");
         audit.record("USER_PASSWORD_RESET", "AppUser", u.getId(), firstSite(u), null);
+    }
+
+    @Transactional(readOnly = true)
+    public List<SessionDto> sessions(UUID id, UUID currentSessionId) {
+        AppUser u = manageable(id);
+        return refreshTokens.findByUserIdAndRevokedAtIsNullAndExpiresAtAfterOrderBySessionStartedAtDesc(u.getId(),
+                        Instant.now()).stream()
+                .map(t -> new SessionDto(t.getSessionId(), t.getSessionStartedAt(), t.getCreatedAt(), t.getExpiresAt(),
+                        t.getIpAddress(), t.getUserAgent(), t.getSessionId().equals(currentSessionId)))
+                .toList();
+    }
+
+    /** Ends one sign-in session, or all of them when {@code sessionId} is null; their access tokens stop at once. */
+    @Transactional
+    public int revokeSessions(UUID id, UUID sessionId) {
+        AppUser u = manageable(id);
+        Instant now = Instant.now();
+        int n = sessionId != null ? refreshTokens.revokeSession(u.getId(), sessionId, now, "REVOKED")
+                : refreshTokens.revokeAllForUser(u.getId(), now, "REVOKED");
+        if (sessionId != null && n == 0) {
+            throw ApiException.notFound("Session");
+        }
+        audit.record("USER_SESSIONS_REVOKED", "AppUser", u.getId(), firstSite(u),
+                sessionId != null ? "session " + sessionId : "all sessions (" + n + ")");
+        return n;
     }
 
     /** Loads a user the current actor is allowed to administer. */

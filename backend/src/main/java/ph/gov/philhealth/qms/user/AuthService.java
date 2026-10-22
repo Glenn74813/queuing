@@ -64,7 +64,20 @@ public class AuthService {
         this.dummyHash = encoder.encode(Hashing.randomToken(16));
     }
 
+    /** Where a sign-in or refresh came from; shown to administrators in the user's session list. */
+    public record ClientInfo(String ipAddress, String userAgent) {
+        public static final ClientInfo UNKNOWN = new ClientInfo(null, null);
+
+        String agent() {
+            return userAgent == null ? null : userAgent.length() > 200 ? userAgent.substring(0, 200) : userAgent;
+        }
+    }
+
     public TokenResponse login(String username, String password) {
+        return login(username, password, ClientInfo.UNKNOWN);
+    }
+
+    public TokenResponse login(String username, String password, ClientInfo client) {
         // Failure bookkeeping must commit even though the request then fails, hence explicit transactions.
         ApiException failure = tx.execute(status -> {
             Instant now = time.now();
@@ -105,11 +118,15 @@ public class AuthService {
             u.setLockedUntil(null);
             u.setLastLoginAt(time.now());
             audit.record("LOGIN_SUCCEEDED", "AppUser", u.getId(), null, null, u.getId(), u.getUsername());
-            return issueTokens(u);
+            return issueTokens(u, null, client);
         });
     }
 
     public TokenResponse refresh(String rawToken) {
+        return refresh(rawToken, ClientInfo.UNKNOWN);
+    }
+
+    public TokenResponse refresh(String rawToken, ClientInfo client) {
         // Explicit transaction: the reuse-detection revocation must commit even though the request fails.
         Object outcome = tx.execute(status -> {
             RefreshToken token = refreshTokens.findByTokenHash(Hashing.sha256Hex(rawToken)).orElse(null);
@@ -130,7 +147,7 @@ public class AuthService {
                         return unauthorized();
                     }
                     audit.record("REFRESH_TOKEN_GRACE_REUSE", "AppUser", u.getId(), null, null, u.getId(), u.getUsername());
-                    return issueTokens(u, token);
+                    return issueTokens(u, token, client);
                 }
                 // Any other reuse suggests theft: revoke every refresh token of the user.
                 refreshTokens.revokeAllForUser(token.getUserId(), now, "REUSE_DETECTED");
@@ -144,7 +161,7 @@ public class AuthService {
             }
             token.setRevokedAt(now);
             token.setRevokedReason("ROTATED");
-            return issueTokens(u, token);
+            return issueTokens(u, token, client);
         });
         if (outcome instanceof ApiException e) {
             throw e;
@@ -198,23 +215,25 @@ public class AuthService {
         return refreshTokens.findById(token.getReplacedBy()).filter(s -> s.getRevokedAt() == null).orElse(null);
     }
 
-    private TokenResponse issueTokens(AppUser u) {
-        return issueTokens(u, null);
-    }
-
-    private TokenResponse issueTokens(AppUser u, RefreshToken parent) {
+    /** A new pair; with a parent, the pair continues the parent's sign-in session. */
+    private TokenResponse issueTokens(AppUser u, RefreshToken parent, ClientInfo client) {
         String raw = "qrt_" + Hashing.randomToken(32);
         RefreshToken rt = new RefreshToken();
         rt.setId(Ids.newId());
         rt.setUserId(u.getId());
         rt.setTokenHash(Hashing.sha256Hex(raw));
         rt.setCreatedAt(time.now());
+        rt.setSessionId(parent != null ? parent.getSessionId() : rt.getId());
+        rt.setSessionStartedAt(parent != null ? parent.getSessionStartedAt() : rt.getCreatedAt());
+        rt.setIpAddress(client.ipAddress() != null ? client.ipAddress() : parent != null ? parent.getIpAddress() : null);
+        rt.setUserAgent(client.agent() != null ? client.agent() : parent != null ? parent.getUserAgent() : null);
         rt.setExpiresAt(time.now().plus(Duration.ofHours(props.security().refreshTokenHours())));
         refreshTokens.save(rt);
         if (parent != null) {
             parent.setReplacedBy(rt.getId());
         }
-        return new TokenResponse(jwt.issueAccessToken(u.getId(), u.getUsername()), raw, jwt.accessTtlSeconds(),
+        return new TokenResponse(jwt.issueAccessToken(u.getId(), u.getUsername(), rt.getSessionId()), raw,
+                jwt.accessTtlSeconds(),
                 toMe(u));
     }
 
@@ -225,7 +244,8 @@ public class AuthService {
                 .sorted(Comparator.comparing(s -> s.getName()))
                 .map(s -> new SiteRef(s.getId(), s.getCode(), s.getName())).toList();
         return new Me(u.getId(), u.getUsername(), u.getFullName(), u.isMustChangePassword(), au.permissions(),
-                u.getAssignments().stream().map(AssignmentDto::of).toList(), siteRefs);
+                u.getAssignments().stream().map(AssignmentDto::of).toList(), siteRefs,
+                Math.max(0, props.security().idleTimeoutMinutes()));
     }
 
     private static ApiException invalidCredentials() {

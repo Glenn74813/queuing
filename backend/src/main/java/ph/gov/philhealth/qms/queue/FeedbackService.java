@@ -1,5 +1,6 @@
 package ph.gov.philhealth.qms.queue;
 
+import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ph.gov.philhealth.qms.common.ApiException;
@@ -33,6 +34,12 @@ public class FeedbackService {
     public void submit(DevicePrincipal device, FeedbackRequest req) {
         Ticket t = tickets.findById(req.ticketId()).filter(x -> x.getSiteId().equals(device.siteId()))
                 .orElseThrow(() -> ApiException.notFound("Ticket"));
+        submit(t, req.rating(), req.comment());
+    }
+
+    /** Feedback from the client's phone (ticket QR link). */
+    @Transactional
+    public void submit(Ticket t, int rating, String comment) {
         if (t.getStatus() != TicketStatus.COMPLETED) {
             throw ApiException.conflict("Feedback can be given only for completed transactions");
         }
@@ -43,10 +50,14 @@ public class FeedbackService {
         f.setId(Ids.newId());
         f.setTicketId(t.getId());
         f.setSiteId(t.getSiteId());
-        f.setRating((short) req.rating());
-        f.setComment(req.comment());
+        f.setRating((short) rating);
+        f.setComment(comment == null || comment.isBlank() ? null : comment.trim());
         f.setSubmittedAt(time.now());
         repo.save(f);
         outbox.enqueue("FEEDBACK_SUBMITTED", "Feedback", f.getId().toString(), Snapshots.of(f));
+    }
+
+    public boolean given(UUID ticketId) {
+        return repo.existsByTicketId(ticketId);
     }
 }

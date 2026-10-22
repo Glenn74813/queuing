@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { toApiError } from '../../api/client';
 import { kioskApi } from '../../api/device';
 import type { Channel, IssueTicketRequest, IssuedTicket, KioskConfig, KioskService } from '../../api/types';
 import { AGENCY_NAME, AgencyBrand } from '../../components/AgencyBrand';
+import { QrCode } from '../../components/QrCode';
 import { useClock } from '../../hooks/useClock';
 import { useIdleTimer } from '../../hooks/useIdleTimer';
 import { formatDateTime } from '../../utils/format';
 import { issueWithRetry, newIssueRequest } from '../../utils/kioskIssue';
+import { ticketLink } from '../../utils/ticketLink';
 import { ContentRotator, Ticker } from './ContentRotator';
 import { DeviceShell, isContentLive } from './DeviceShell';
 
@@ -20,6 +23,7 @@ type Step =
   | { name: 'channel'; service: KioskService; priorityId?: string; priorityName?: string }
   | { name: 'issuing' }
   | { name: 'result'; ticket: IssuedTicket }
+  | { name: 'rate' }
   | { name: 'error'; message: string; retriable: boolean };
 
 /** Maps an issuance failure to a message suitable for the public. */
@@ -33,8 +37,58 @@ function friendlyIssueError(err: unknown): { message: string; retriable: boolean
   return { message: 'Sorry, this service is not available right now. Please choose another service or ask a staff member.', retriable: false };
 }
 
+/** On-screen keypad for typing a ticket number: the site's service prefixes, digits and backspace. */
+function RateLookup({ prefixes, onCancel }: { prefixes: string[]; onCancel: () => void }) {
+  const navigate = useNavigate();
+  const [number, setNumber] = useState('');
+  const [message, setMessage] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const letters = Array.from(new Set(prefixes.join('').split(''))).sort();
+  const press = (k: string) => {
+    setMessage(null);
+    setNumber((n) => (n + k).slice(0, 10));
+  };
+  const find = async () => {
+    setBusy(true);
+    try {
+      const t = await kioskApi.feedbackTicket(number);
+      navigate(`/feedback/${t.ticketId}`);
+    } catch (err) {
+      const e = toApiError(err);
+      setMessage(e.status === 404
+        ? 'We could not find a finished transaction with that number today, or it has already been rated.'
+        : 'We cannot connect to the queue system right now. Please try again.');
+    } finally {
+      setBusy(false);
+    }
+  };
+  const key = (k: string) => (
+    <button key={k} type="button" className="btn btn-outline-primary btn-lg kiosk-key" onClick={() => press(k)}>{k}</button>
+  );
+  return (
+    <section className="text-center" aria-labelledby="rate-heading">
+      <h1 id="rate-heading" className="display-6 mb-2">Rate our service</h1>
+      <p className="fs-4 mb-3">Enter the number on your ticket</p>
+      <output className="kiosk-ticket-number d-block mb-3" aria-live="polite">{number || '—'}</output>
+      {message && <div className="alert alert-warning fs-5" role="alert">{message}</div>}
+      <div className="d-flex flex-wrap justify-content-center gap-2 mb-2">{letters.map(key)}</div>
+      <div className="d-flex flex-wrap justify-content-center gap-2 mb-3" style={{ maxWidth: 520, margin: '0 auto' }}>
+        {['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'].map(key)}
+        <button type="button" className="btn btn-outline-secondary btn-lg kiosk-key" aria-label="Delete last character"
+          onClick={() => setNumber((n) => n.slice(0, -1))}>⌫</button>
+      </div>
+      <div className="d-flex justify-content-center gap-3">
+        <button type="button" className="btn btn-outline-secondary btn-lg" onClick={onCancel}>Cancel</button>
+        <button type="button" className="btn btn-primary btn-lg px-5" disabled={number.length < 2 || busy} onClick={() => void find()}>
+          {busy ? 'Searching…' : 'Continue'}
+        </button>
+      </div>
+    </section>
+  );
+}
+
 /** Print-only 80 mm ticket layout (see @media print in styles.css). */
-function PrintTicket({ ticket }: { ticket: IssuedTicket }) {
+function PrintTicket({ ticket, link }: { ticket: IssuedTicket; link: string | null }) {
   return (
     <div className="print-ticket" aria-hidden="true">
       <div className="pt-site">{AGENCY_NAME}</div>
@@ -50,6 +104,12 @@ function PrintTicket({ ticket }: { ticket: IssuedTicket }) {
       <div className="pt-line">Estimated wait: ~{ticket.estimatedWaitMinutes} min</div>
       <hr />
       <div className="pt-line">Please watch the display for your number.</div>
+      {link && (
+        <>
+          <QrCode value={link} label="" size={110} className="pt-qr" />
+          <div className="pt-line">Scan to follow your queue and rate our service</div>
+        </>
+      )}
     </div>
   );
 }
@@ -115,6 +175,9 @@ function KioskApp() {
     }
   }, [step]);
 
+  const link = step.name === 'result' && step.ticket.publicToken
+    ? ticketLink(step.ticket.publicToken, config?.ticketLinkBaseUrl) : null;
+
   const chooseService = (service: KioskService) =>
     setStep(priorities.length > 0 ? { name: 'priority', service } : { name: 'channel', service });
 
@@ -157,8 +220,17 @@ function KioskApp() {
                 </div>
               ))}
             </div>
+            {config && (
+              <div className="text-center mt-4">
+                <button type="button" className="btn btn-outline-warning btn-lg px-5" onClick={() => setStep({ name: 'rate' })}>
+                  <span aria-hidden="true">★ </span>Rate our service
+                </button>
+              </div>
+            )}
           </>
         )}
+
+        {step.name === 'rate' && <RateLookup prefixes={services.map((s) => s.prefix)} onCancel={goHome} />}
 
         {step.name === 'priority' && (
           <section className="text-center">
@@ -229,13 +301,21 @@ function KioskApp() {
             <p className="fs-5 text-body-secondary">
               {step.ticket.channel === 'PRINTED' ? 'Please take your printed ticket.' : 'Please remember or photograph this number.'} Watch the display for your number.
             </p>
+            {link && (
+              <div className="d-inline-flex align-items-center gap-3 border rounded p-3 bg-white text-start">
+                <QrCode value={link} label={`QR code linking to ticket ${step.ticket.displayNumber} on your phone`} size={150} />
+                <div className="fs-5" style={{ maxWidth: 260 }}>
+                  <strong>Scan with your phone</strong> to follow your place in line and rate our service afterwards.
+                </div>
+              </div>
+            )}
             <div className="d-flex justify-content-center gap-3 mt-4">
               {step.ticket.channel === 'PRINTED' && (
                 <button type="button" className="btn btn-outline-primary btn-lg" onClick={() => window.print()}>Print again</button>
               )}
               <button type="button" className="btn btn-primary btn-lg px-5" onClick={goHome}>Done</button>
             </div>
-            <PrintTicket ticket={step.ticket} />
+            <PrintTicket ticket={step.ticket} link={link} />
           </section>
         )}
 

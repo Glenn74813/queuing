@@ -6,7 +6,7 @@ import { RequirePermission } from './RequirePermission';
 import { hasAnyPermission } from './permissions';
 
 function authWith(permissions: string[]): AuthContextValue {
-  const me: Me = { id: 'u1', username: 'jdoe', fullName: 'J Doe', mustChangePassword: false, permissions, assignments: [], sites: [] };
+  const me: Me = { id: 'u1', username: 'jdoe', fullName: 'J Doe', mustChangePassword: false, permissions, assignments: [], sites: [], idleTimeoutMinutes: 0 };
   return {
     status: 'authenticated',
     me,

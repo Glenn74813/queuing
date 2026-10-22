@@ -27,6 +27,7 @@ import { UsersPage } from './pages/admin/UsersPage';
 import { DisplayPage } from './pages/device/DisplayPage';
 import { FeedbackPage } from './pages/device/FeedbackPage';
 import { KioskPage } from './pages/device/KioskPage';
+import { TicketStatusPage } from './pages/public/TicketStatusPage';
 import type { ReactElement } from 'react';
 
 /** Sends the user to the first page their permissions allow. */
@@ -69,6 +70,8 @@ export function App() {
       <Route path="/kiosk" element={<KioskPage />} />
       <Route path="/display" element={<DisplayPage />} />
       <Route path="/feedback/:ticketId" element={<FeedbackPage />} />
+      {/* Public phone e-ticket (QR code link) */}
+      <Route path="/t/:token" element={<TicketStatusPage />} />
 
       {/* Staff application */}
       <Route

@@ -28,6 +28,8 @@ class CatalogIT {
     MockMvc mvc;
     @Autowired
     TestData data;
+    @Autowired
+    org.springframework.jdbc.core.JdbcTemplate jdbc;
 
     private Map<String, Object> item(String code, LocalDate from, LocalDate to) {
         Map<String, Object> m = new HashMap<>();
@@ -126,5 +128,31 @@ class CatalogIT {
         return mvc.perform(post("/api/v1/kiosk/tickets").header("X-Device-Key", site.kioskKey())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(data.json(Map.of("siteServiceId", ssId, "channel", "PRINTED", "requestId", UUID.randomUUID()))));
+    }
+
+    @Test
+    void addAllCatalogServicesFillsTheSiteOnceWithUniquePrefixes() throws Exception {
+        TestData.SiteFixture site = data.site();
+        String admin = data.login(mvc, data.user("LHIO_ADMIN", null, site.siteId()));
+        String agent = data.login(mvc, data.user("AGENT", null, site.siteId()));
+        String path = "/api/v1/sites/" + site.siteId() + "/services/add-catalog";
+        mvc.perform(post(path).header("Authorization", agent)).andExpect(status().isForbidden());
+
+        JsonNode added = data.read(mvc.perform(post(path).header("Authorization", admin))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+        Integer wanted = jdbc.queryForObject("""
+                select count(*) from service_item
+                where active and (effective_to is null or effective_to >= current_date)""", Integer.class);
+        // The fixture already offered two of them; the rest were added, each exactly once.
+        assertThat(added.size()).isEqualTo(wanted - 2);
+        assertThat(jdbc.queryForObject("select count(distinct prefix) from site_service where site_id = ?",
+                Integer.class, site.siteId())).isEqualTo(wanted);
+        for (JsonNode s : added) {
+            assertThat(s.get("prefix").asText()).matches("^[A-Z]{1,3}$");
+            assertThat(s.get("active").asBoolean()).isTrue();
+        }
+        // Nothing left to add the second time.
+        mvc.perform(post(path).header("Authorization", admin)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
     }
 }

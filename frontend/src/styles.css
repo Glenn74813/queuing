@@ -130,6 +130,12 @@
   background: var(--qms-primary);
   color: #fff;
 }
+.kiosk-key {
+  min-width: 80px;
+  min-height: 72px;
+  font-size: 1.8rem;
+  font-weight: 700;
+}
 .kiosk-btn {
   min-height: 120px;
   font-size: 1.6rem;
@@ -283,6 +289,12 @@
   .print-ticket .pt-line {
     font-size: 10pt;
     margin: 0.5mm 0;
+  }
+  .print-ticket .pt-qr {
+    display: block;
+    margin: 2mm auto 1mm;
+    width: 28mm;
+    height: 28mm;
   }
   .print-ticket hr {
     border: 0;

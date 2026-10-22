@@ -98,6 +98,20 @@ export interface Me {
   permissions: string[];
   assignments: Assignment[];
   sites: SiteRef[];
+  /** The portal signs out after this many minutes without activity; 0 = never. */
+  idleTimeoutMinutes: number;
+}
+
+/** A live sign-in session (one per browser sign-in), as listed for administrators. */
+export interface UserSession {
+  id: string;
+  startedAt: string;
+  lastActiveAt: string;
+  expiresAt: string;
+  ipAddress?: string;
+  userAgent?: string;
+  /** The administrator's own session. */
+  current: boolean;
 }
 
 export interface TokenResponse {
@@ -145,7 +159,13 @@ export interface Site {
   area?: string;
   timezone: string;
   active: boolean;
+  ticketNumberDigits: number;
+  ticketNumberSeparator: '-' | '';
+  ticketNumberReset: TicketNumberReset;
 }
+
+/** When ticket numbers start again from 1. */
+export type TicketNumberReset = 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'YEARLY';
 
 export interface SiteInput {
   code: string;
@@ -155,6 +175,9 @@ export interface SiteInput {
   area?: string;
   timezone: string;
   active?: boolean;
+  ticketNumberDigits?: number;
+  ticketNumberSeparator?: '-' | '';
+  ticketNumberReset?: TicketNumberReset;
 }
 
 /* ---------- Users & roles ---------- */
@@ -431,6 +454,8 @@ export interface KioskConfig {
   services: KioskService[];
   priorityCategories: { id: string; code: string; name: string; description?: string }[];
   content: Content[];
+  /** Origin for QR e-ticket links when phones cannot reach the kiosk's own address; null = kiosk origin. */
+  ticketLinkBaseUrl?: string | null;
 }
 
 export interface IssueTicketRequest {
@@ -440,7 +465,30 @@ export interface IssueTicketRequest {
   requestId: string;
 }
 
-export type IssuedTicket = Ticket & { siteName: string; waitingAhead: number; estimatedWaitMinutes: number };
+/** publicToken opens the client's phone view of the ticket (QR code); only present in the issue response. */
+export type IssuedTicket = Ticket & { siteName: string; waitingAhead: number; estimatedWaitMinutes: number; publicToken?: string };
+
+/** The client's phone view of their ticket (/t/:token). */
+export interface PublicTicketStatus {
+  displayNumber: string;
+  serviceName: string;
+  siteName: string;
+  status: TicketStatus;
+  waitingAhead: number;
+  estimatedWaitMinutes: number;
+  counterName?: string;
+  issuedAt: string;
+  lastCalledAt?: string;
+  feedbackOpen: boolean;
+  feedbackGiven: boolean;
+}
+
+/** Today's completed ticket found by number at the kiosk ("Rate our service"). */
+export interface FeedbackTicket {
+  ticketId: string;
+  displayNumber: string;
+  serviceName: string;
+}
 
 export interface FeedbackRequest {
   ticketId: string;

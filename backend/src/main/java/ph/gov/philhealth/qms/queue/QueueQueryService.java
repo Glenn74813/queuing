@@ -29,11 +29,13 @@ import ph.gov.philhealth.qms.queue.QueueDtos.IssuedTicket;
 import ph.gov.philhealth.qms.queue.QueueDtos.KioskConfig;
 import ph.gov.philhealth.qms.queue.QueueDtos.KioskPriority;
 import ph.gov.philhealth.qms.queue.QueueDtos.KioskService;
+import ph.gov.philhealth.qms.queue.QueueDtos.PublicTicketStatus;
 import ph.gov.philhealth.qms.queue.QueueDtos.QueueSnapshot;
 import ph.gov.philhealth.qms.queue.QueueDtos.QueueStats;
 import ph.gov.philhealth.qms.queue.QueueDtos.ServiceLoad;
 import ph.gov.philhealth.qms.queue.QueueDtos.SiteRef;
 import ph.gov.philhealth.qms.queue.QueueDtos.TicketDetail;
+import ph.gov.philhealth.qms.queue.QueueDtos.TicketDto;
 import ph.gov.philhealth.qms.queue.QueueDtos.TicketEventDto;
 import ph.gov.philhealth.qms.security.DevicePrincipal;
 import ph.gov.philhealth.qms.security.Permission;
@@ -241,7 +243,9 @@ public class QueueQueryService {
         List<KioskPriority> prios = priorities.findAllByOrderByRankAscCodeAsc().stream()
                 .filter(PriorityCategory::isActive)
                 .map(p -> new KioskPriority(p.getId(), p.getCode(), p.getName(), p.getDescription())).toList();
-        return new KioskConfig(ref(site), services, prios, content.activeFor(site));
+        String linkBase = props.kiosk().ticketLinkBaseUrl();
+        return new KioskConfig(ref(site), services, prios, content.activeFor(site),
+                linkBase == null || linkBase.isBlank() ? null : linkBase.replaceAll("/+$", ""));
     }
 
     @Transactional(readOnly = true)
@@ -253,7 +257,28 @@ public class QueueQueryService {
         SiteService service = lookup.services().get(t.getSiteServiceId());
         int servers = (int) Math.max(1, activeServers(counters.listUnchecked(site.getId()), t.getSiteServiceId()));
         int est = (int) Math.ceil((double) ahead * service.getEstimatedDurationMinutes() / servers);
-        return new IssuedTicket(mapper.toDto(t, lookup), site.getName(), ahead, est);
+        return new IssuedTicket(mapper.toDto(t, lookup), site.getName(), ahead, est, null);
+    }
+
+    /** Phone view of a ticket: position while waiting, counter while called, feedback once completed. */
+    @Transactional(readOnly = true)
+    public PublicTicketStatus publicStatus(Ticket t, boolean feedbackGiven) {
+        Site site = sites.findById(t.getSiteId()).orElseThrow();
+        TicketMapper.Lookup lookup = mapper.lookup(site.getId());
+        TicketDto dto = mapper.toDto(t, lookup);
+        long ahead = 0;
+        int est = 0;
+        if (t.getStatus() == TicketStatus.WAITING) {
+            ahead = tickets.countAhead(site.getId(), t.getBusinessDate(), t.getSiteServiceId(), t.getPriorityRank(),
+                    t.getQueuedAt());
+            SiteService service = lookup.services().get(t.getSiteServiceId());
+            int servers = (int) Math.max(1, activeServers(counters.listUnchecked(site.getId()), t.getSiteServiceId()));
+            est = (int) Math.ceil((double) ahead * service.getEstimatedDurationMinutes() / servers);
+        }
+        boolean called = t.getStatus() == TicketStatus.CALLED;
+        return new PublicTicketStatus(dto.displayNumber(), dto.serviceName(), site.getName(), t.getStatus(), ahead, est,
+                called ? dto.counterName() : null, t.getIssuedAt(), called ? t.getLastCalledAt() : null,
+                t.getStatus() == TicketStatus.COMPLETED && !feedbackGiven, feedbackGiven);
     }
 
     @Transactional(readOnly = true)

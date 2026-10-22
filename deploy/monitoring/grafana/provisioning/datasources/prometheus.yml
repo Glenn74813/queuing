@@ -1,0 +1,8 @@
+# Example Prometheus data source; point url at the Prometheus that loads ../../prometheus.yml.
+apiVersion: 1
+datasources:
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true

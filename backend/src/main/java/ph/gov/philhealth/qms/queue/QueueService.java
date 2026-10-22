@@ -119,7 +119,7 @@ public class QueueService {
         }
         Instant now = time.now();
         LocalDate businessDate = time.businessDate(site.getTimezone());
-        int seq = numbers.next(site.getId(), service.getPrefix(), businessDate);
+        int seq = numbers.next(site.getId(), service.getPrefix(), businessDate, site.getTicketNumberReset());
 
         Ticket t = new Ticket();
         t.setId(Ids.newId());
@@ -129,7 +129,8 @@ public class QueueService {
         t.setBusinessDate(businessDate);
         t.setPrefix(service.getPrefix());
         t.setSeqNo(seq);
-        t.setDisplayNumber(TicketNumberAllocator.format(service.getPrefix(), seq));
+        t.setDisplayNumber(TicketNumberAllocator.format(service.getPrefix(), seq, site.getTicketNumberSeparator(),
+                site.getTicketNumberDigits()));
         t.setPriorityCategoryId(priorityCategoryId);
         t.setPriorityRank(rank);
         t.setChannel(channel);

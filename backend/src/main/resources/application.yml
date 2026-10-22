@@ -86,6 +86,7 @@ qms:
     login-rate-per-minute: ${QMS_LOGIN_RATE_PER_MINUTE:20}
     bootstrap-admin-password: ${QMS_BOOTSTRAP_ADMIN_PASSWORD:}
     metrics-token: ${QMS_METRICS_TOKEN:}    # bearer token for Prometheus scraping of /actuator/prometheus
+    idle-timeout-minutes: ${QMS_IDLE_TIMEOUT_MINUTES:30}   # portal signs out after this much inactivity; 0 = never
   storage:
     media-dir: ${QMS_MEDIA_DIR:./data/media}
     reports-dir: ${QMS_REPORTS_DIR:./data/reports}          # generated scheduled reports
@@ -103,3 +104,12 @@ qms:
     super-admin-self-approval: ${QMS_CMS_SUPER_ADMIN_SELF_APPROVAL:true}   # false = strict two-person approval
   queue:
     expire-cron: ${QMS_EXPIRE_CRON:0 5 * * * *}   # hourly: expire open tickets of previous business days
+  kiosk:
+    ticket-link-base-url: ${QMS_TICKET_LINK_BASE_URL:}   # e.g. https://qms-lhio-ncr01.example; blank = kiosk origin
+  retention:                                  # days; 0 = keep forever (OI-13: PhilHealth policy pending)
+    cron: ${QMS_RETENTION_CRON:0 15 2 * * *}  # daily 02:15
+    ticket-days: ${QMS_RETENTION_TICKET_DAYS:0}
+    audit-days: ${QMS_RETENTION_AUDIT_DAYS:0}
+    sent-outbox-days: ${QMS_RETENTION_SENT_OUTBOX_DAYS:30}
+    expired-token-days: ${QMS_RETENTION_EXPIRED_TOKEN_DAYS:30}
+    batch-size: 5000

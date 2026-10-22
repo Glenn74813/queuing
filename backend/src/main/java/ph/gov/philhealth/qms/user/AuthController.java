@@ -31,19 +31,23 @@ public class AuthController {
     @PostMapping("/login")
     public TokenResponse login(@Valid @RequestBody LoginRequest req, HttpServletRequest http) {
         limiter.check(http.getRemoteAddr());
-        return auth.login(req.username(), req.password());
+        return auth.login(req.username(), req.password(), client(http));
     }
 
     @PostMapping("/refresh")
     public TokenResponse refresh(@Valid @RequestBody RefreshRequest req, HttpServletRequest http) {
         limiter.check(http.getRemoteAddr());
-        return auth.refresh(req.refreshToken());
+        return auth.refresh(req.refreshToken(), client(http));
     }
 
     @PostMapping("/logout")
     public ResponseEntity<Void> logout(@Valid @RequestBody RefreshRequest req) {
         auth.logout(req.refreshToken());
         return ResponseEntity.noContent().build();
+    }
+
+    private static AuthService.ClientInfo client(HttpServletRequest http) {
+        return new AuthService.ClientInfo(http.getRemoteAddr(), http.getHeader("User-Agent"));
     }
 
     @GetMapping("/me")

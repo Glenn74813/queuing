@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react';
+import { toApiError } from '../../api/client';
 import { orgApi } from '../../api/org';
 import type { AssignmentInput, User, UserStatus } from '../../api/types';
 import { usersApi } from '../../api/users';
@@ -7,6 +8,7 @@ import { DataTable } from '../../components/DataTable';
 import { ErrorAlert } from '../../components/ErrorAlert';
 import { SelectField, TextField, enumOptions } from '../../components/FormFields';
 import { FormModal } from '../../components/FormModal';
+import { Modal } from '../../components/Modal';
 import { PageHeader } from '../../components/PageHeader';
 import { ReasonDialog } from '../../components/ReasonDialog';
 import { StatusBadge } from '../../components/StatusBadge';
@@ -20,7 +22,7 @@ const PAGE_SIZE = 20;
 
 type Dialog =
   | { kind: 'create' }
-  | { kind: 'edit' | 'status' | 'password' | 'assignments'; user: User }
+  | { kind: 'edit' | 'status' | 'password' | 'assignments' | 'sessions'; user: User }
   | null;
 
 /** Reference data needed by the assignment editor (loaded only when a dialog needs it). */
@@ -109,6 +111,7 @@ export function UsersPage() {
                 <button type="button" className="btn btn-outline-primary" onClick={() => setDialog({ kind: 'assignments', user: u })}>Roles</button>
                 <button type="button" className="btn btn-outline-warning" onClick={() => setDialog({ kind: 'status', user: u })}>Status</button>
                 <button type="button" className="btn btn-outline-secondary" onClick={() => setDialog({ kind: 'password', user: u })}>Reset password</button>
+                <button type="button" className="btn btn-outline-secondary" onClick={() => setDialog({ kind: 'sessions', user: u })}>Sessions</button>
               </div>
             ),
           }] : []),
@@ -126,6 +129,7 @@ export function UsersPage() {
       {dialog?.kind === 'password' && (
         <ResetPasswordDialog user={dialog.user} onClose={() => setDialog(null)} onDone={setNotice} />
       )}
+      {dialog?.kind === 'sessions' && <SessionsDialog user={dialog.user} onClose={() => setDialog(null)} />}
     </>
   );
 }
@@ -227,5 +231,73 @@ function ResetPasswordDialog({ user, onClose, onDone }: { user: User; onClose: (
           onChange={setPw} error={fe('newPassword')} hint={PASSWORD_HINT} />
       )}
     </FormModal>
+  );
+}
+
+/** Short browser/OS label from a user-agent string, e.g. "Chrome on Windows". */
+export function describeAgent(ua?: string): string {
+  if (!ua) return 'Unknown device';
+  const browser = /Edg\//.test(ua) ? 'Edge' : /Firefox\//.test(ua) ? 'Firefox' : /Chrome\//.test(ua) ? 'Chrome'
+    : /Safari\//.test(ua) ? 'Safari' : 'Browser';
+  const os = /Windows/.test(ua) ? 'Windows' : /Android/.test(ua) ? 'Android' : /iPhone|iPad/.test(ua) ? 'iOS'
+    : /Mac OS X/.test(ua) ? 'macOS' : /Linux/.test(ua) ? 'Linux' : '';
+  return os ? `${browser} on ${os}` : browser;
+}
+
+/** Live sign-ins of a user; ending one signs that browser out at once (its next request is refused). */
+function SessionsDialog({ user, onClose }: { user: User; onClose: () => void }) {
+  const sessions = useAsync(() => usersApi.sessions(user.id), [user.id]);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<unknown>(null);
+  const act = async (fn: () => Promise<void>) => {
+    setBusy(true);
+    setError(null);
+    try {
+      await fn();
+      await sessions.reload();
+    } catch (e) {
+      setError(e);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const list = sessions.data ?? [];
+  return (
+    <Modal title={`Sign-in sessions — ${user.username}`} size="lg" onClose={onClose}
+      footer={(
+        <>
+          <button type="button" className="btn btn-outline-danger me-auto" disabled={busy || list.length === 0}
+            onClick={() => void act(() => usersApi.revokeAllSessions(user.id))}>
+            Sign out everywhere
+          </button>
+          <button type="button" className="btn btn-secondary" onClick={onClose}>Close</button>
+        </>
+      )}>
+      <ErrorAlert error={sessions.error ?? (error ? toApiError(error) : null)} />
+      <DataTable caption={`Sign-in sessions of ${user.username}`} loading={sessions.loading} rows={sessions.data}
+        rowKey={(s) => s.id} emptyText="Not signed in anywhere."
+        columns={[
+          { key: 'device', header: 'Device', render: (s) => (
+            <>
+              {describeAgent(s.userAgent)}
+              {s.current && <span className="badge text-bg-info ms-1">This browser</span>}
+              <div className="small text-body-secondary">{s.ipAddress ?? '—'}</div>
+            </>
+          ) },
+          { key: 'startedAt', header: 'Signed in', render: (s) => formatDateTime(s.startedAt) },
+          { key: 'lastActiveAt', header: 'Last token refresh', render: (s) => formatDateTime(s.lastActiveAt) },
+          { key: 'actions', header: <span className="visually-hidden">Actions</span>, className: 'text-end',
+            render: (s) => (
+              <button type="button" className="btn btn-sm btn-outline-danger" disabled={busy}
+                onClick={() => void act(() => usersApi.revokeSession(user.id, s.id))}>
+                Sign out
+              </button>
+            ) },
+        ]} />
+      <p className="small text-body-secondary mb-0">
+        Resetting the password, suspending the account or the user changing their password also ends all sessions.
+        {list.some((s) => s.current) && ' These are your own sessions: signing out "This browser" or everywhere signs you out here too.'}
+      </p>
+    </Modal>
   );
 }

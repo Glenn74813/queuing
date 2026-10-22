@@ -1,5 +1,5 @@
 import { api, cleanParams } from './client';
-import type { AssignmentInput, Page, Role, User, UserCreateInput, UserStatus, UserUpdateInput } from './types';
+import type { AssignmentInput, Page, Role, User, UserCreateInput, UserSession, UserStatus, UserUpdateInput } from './types';
 
 export const usersApi = {
   list: (params: { q?: string; page?: number; size?: number }) =>
@@ -12,5 +12,9 @@ export const usersApi = {
     api.put<User>(`/users/${id}/assignments`, assignments).then((r) => r.data),
   resetPassword: (id: string, newPassword: string) =>
     api.post<void>(`/users/${id}/reset-password`, { newPassword }).then(() => undefined),
+  sessions: (id: string) => api.get<UserSession[]>(`/users/${id}/sessions`).then((r) => r.data),
+  revokeSession: (id: string, sessionId: string) =>
+    api.delete<void>(`/users/${id}/sessions/${sessionId}`).then(() => undefined),
+  revokeAllSessions: (id: string) => api.delete<void>(`/users/${id}/sessions`).then(() => undefined),
   listRoles: () => api.get<Role[]>('/roles').then((r) => r.data),
 };

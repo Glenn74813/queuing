@@ -10,7 +10,8 @@ export function LoginPage() {
   const { login, status } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const from = (location.state as { from?: string } | null)?.from ?? '/';
+  const state = location.state as { from?: string; reason?: string } | null;
+  const from = state?.from ?? '/';
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
@@ -42,6 +43,9 @@ export function LoginPage() {
           </div>
           <h1 className="h4 mb-1">Queueing Management System</h1>
           <p className="text-body-secondary small">{AGENCY_NAME} — staff sign in</p>
+          {state?.reason === 'idle' && !error && (
+            <div className="alert alert-info small" role="status">You were signed out after a period of inactivity.</div>
+          )}
           <ErrorAlert error={error} />
           <form onSubmit={submit}>
             <div className="mb-3">

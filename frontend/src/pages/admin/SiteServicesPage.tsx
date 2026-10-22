@@ -6,6 +6,7 @@ import { DataTable } from '../../components/DataTable';
 import { ErrorAlert } from '../../components/ErrorAlert';
 import { CheckField, SelectField, TextField } from '../../components/FormFields';
 import { FormModal } from '../../components/FormModal';
+import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { PageHeader } from '../../components/PageHeader';
 import { NoSiteNotice } from '../../components/SiteSelector';
 import { ActiveBadge } from '../../components/StatusBadge';
@@ -78,12 +79,31 @@ export function SiteServicesPage() {
   const services = useAsync(() => catalogApi.listSiteServices(siteId as string), [siteId], !!siteId);
   const catalog = useAsync(() => catalogApi.listServiceItems(), []);
   const [edit, setEdit] = useState<SiteService | 'new' | null>(null);
+  const [confirmAll, setConfirmAll] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
   if (!siteId) return <NoSiteNotice />;
+  const offered = new Set((services.data ?? []).map((s) => s.serviceItemId));
+  const today = new Date().toISOString().slice(0, 10);
+  const missing = (catalog.data ?? []).filter((i) => i.active && (!i.effectiveTo || i.effectiveTo >= today) && !offered.has(i.id));
   return (
     <>
       <PageHeader title="Site Services" subtitle={site?.name}
-        actions={<button type="button" className="btn btn-primary" disabled={!catalog.data} onClick={() => setEdit('new')}>Add service</button>} />
+        actions={(
+          <div className="d-flex gap-2">
+            <button type="button" className="btn btn-outline-primary" disabled={!catalog.data || !services.data || missing.length === 0}
+              onClick={() => setConfirmAll(true)}>
+              Add all catalog services{services.data && catalog.data ? ` (${missing.length})` : ''}
+            </button>
+            <button type="button" className="btn btn-primary" disabled={!catalog.data} onClick={() => setEdit('new')}>Add service</button>
+          </div>
+        )} />
       <ErrorAlert error={services.error ?? catalog.error} />
+      {notice && (
+        <div className="alert alert-success alert-dismissible" role="status">
+          {notice}
+          <button type="button" className="btn-close" aria-label="Dismiss" onClick={() => setNotice(null)} />
+        </div>
+      )}
       <DataTable caption="Services offered at this site" loading={services.loading} rowKey={(s) => s.id}
         rows={services.data?.slice().sort((a, b) => a.sortOrder - b.sortOrder)}
         columns={[
@@ -98,6 +118,17 @@ export function SiteServicesPage() {
           { key: 'edit', header: <span className="visually-hidden">Actions</span>, className: 'text-end',
             render: (s) => <button type="button" className="btn btn-sm btn-outline-primary" onClick={() => setEdit(s)}>Edit</button> },
         ]} />
+      {confirmAll && (
+        <ConfirmDialog title={`Add ${missing.length} catalog service${missing.length === 1 ? '' : 's'} to ${site?.name ?? 'this site'}?`}
+          message={`Each keeps its catalog prefix and estimated duration (a prefix already used here gets the next free letter) and appears on the kiosk at once: ${missing.map((i) => i.code).join(', ')}. You can edit or deactivate any of them afterwards.`}
+          confirmLabel="Add services"
+          onConfirm={async () => {
+            const added = await catalogApi.addCatalogServices(siteId);
+            setNotice(`${added.length} service${added.length === 1 ? '' : 's'} added.`);
+            await services.reload();
+          }}
+          onClose={() => setConfirmAll(false)} />
+      )}
       {edit && (
         <SiteServiceForm siteId={siteId} svc={edit === 'new' ? null : edit} catalog={catalog.data ?? []} services={services.data ?? []}
           onClose={() => setEdit(null)} onSaved={() => void services.reload()} />

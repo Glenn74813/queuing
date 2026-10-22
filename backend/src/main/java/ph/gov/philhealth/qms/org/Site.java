@@ -12,6 +12,7 @@ import java.util.UUID;
 import lombok.Getter;
 import lombok.Setter;
 import ph.gov.philhealth.qms.common.BaseEntity;
+import ph.gov.philhealth.qms.queue.TicketNumberAllocator;
 
 @Entity
 @Table(name = "site")
@@ -37,4 +38,12 @@ public class Site extends BaseEntity {
     private String area;
     private String timezone = "Asia/Manila";
     private boolean active = true;
+
+    /** Zero-padded width of the number part of a ticket (A-007 is 3). */
+    private int ticketNumberDigits = 3;
+    /** Between prefix and number: "-" or none. */
+    private String ticketNumberSeparator = "-";
+
+    @Enumerated(EnumType.STRING)
+    private TicketNumberAllocator.Reset ticketNumberReset = TicketNumberAllocator.Reset.DAILY;
 }

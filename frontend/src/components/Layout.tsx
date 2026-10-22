@@ -4,6 +4,7 @@ import { useAuth } from '../auth/AuthContext';
 import { hasAnyPermission } from '../auth/permissions';
 import { NAV_GROUPS, NAV_ITEMS } from '../navigation';
 import { AgencyBrand } from './AgencyBrand';
+import { IdleSignOut } from './IdleSignOut';
 import { SiteSelector } from './SiteSelector';
 
 /** Staff application shell: permission-filtered sidebar, top bar with site selector and account menu. */
@@ -76,6 +77,7 @@ export function Layout() {
         </header>
         <main id="main" className="p-3 flex-grow-1" tabIndex={-1}>
           <Outlet />
+          <IdleSignOut />
         </main>
       </div>
     </div>

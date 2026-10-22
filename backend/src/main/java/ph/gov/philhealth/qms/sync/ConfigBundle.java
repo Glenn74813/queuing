@@ -20,8 +20,10 @@ public record ConfigBundle(Instant serverTime, List<RegionRow> regions, List<Sit
     public record RegionRow(UUID id, String code, String name, boolean active) {
     }
 
+    /** Numbering fields are null in bundles from a central node older than V11; the site keeps its own then. */
     public record SiteRow(UUID id, String code, String name, String type, UUID regionId, String area, String timezone,
-                          boolean active) {
+                          boolean active, Integer ticketNumberDigits, String ticketNumberSeparator,
+                          String ticketNumberReset) {
     }
 
     public record ServiceItemRow(UUID id, String code, String name, String description, String classification,

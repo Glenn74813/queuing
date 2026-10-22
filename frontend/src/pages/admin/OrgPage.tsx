@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { orgApi } from '../../api/org';
-import type { Region, Site, SiteInput, SiteType } from '../../api/types';
+import type { Region, Site, SiteInput, SiteType, TicketNumberReset } from '../../api/types';
 import { useAuth } from '../../auth/AuthContext';
 import { DataTable } from '../../components/DataTable';
 import { ErrorAlert } from '../../components/ErrorAlert';
@@ -39,6 +39,18 @@ function RegionForm({ region, onClose, onSaved }: { region: Region | null; onClo
   );
 }
 
+const RESET_OPTIONS: { value: TicketNumberReset; label: string }[] = [
+  { value: 'DAILY', label: 'Every day' },
+  { value: 'WEEKLY', label: 'Every Monday' },
+  { value: 'MONTHLY', label: 'Every month' },
+  { value: 'YEARLY', label: 'Every year' },
+];
+
+/** Same format as the server's TicketNumberAllocator.format. */
+export function ticketNumberSample(prefix: string, seq: number, separator: string, digits: number): string {
+  return `${prefix}${separator}${String(seq).padStart(digits, '0')}`;
+}
+
 function SiteForm({ site, regions, onClose, onSaved }: { site: Site | null; regions: Region[]; onClose: () => void; onSaved: () => void }) {
   const [f, setF] = useState<SiteInput & { active: boolean }>({
     code: site?.code ?? '',
@@ -48,7 +60,11 @@ function SiteForm({ site, regions, onClose, onSaved }: { site: Site | null; regi
     area: site?.area ?? '',
     timezone: site?.timezone ?? 'Asia/Manila',
     active: site?.active ?? true,
+    ticketNumberDigits: site?.ticketNumberDigits ?? 3,
+    ticketNumberSeparator: site?.ticketNumberSeparator ?? '-',
+    ticketNumberReset: site?.ticketNumberReset ?? 'DAILY',
   });
+  const sample = ticketNumberSample('A', 7, f.ticketNumberSeparator ?? '-', f.ticketNumberDigits ?? 3);
   const set = <K extends keyof typeof f>(k: K) => (v: (typeof f)[K]) => setF((p) => ({ ...p, [k]: v }));
   return (
     <FormModal
@@ -59,8 +75,8 @@ function SiteForm({ site, regions, onClose, onSaved }: { site: Site | null; regi
         if (site) await orgApi.updateSite(site.id, body);
         else {
           // Create does not take `active` (new sites start active).
-          const { code, name, type, regionId, area, timezone } = body;
-          await orgApi.createSite({ code, name, type, regionId, area, timezone });
+          const { active: _active, ...create } = body;
+          await orgApi.createSite(create);
         }
         onSaved();
       }}
@@ -83,6 +99,24 @@ function SiteForm({ site, regions, onClose, onSaved }: { site: Site | null; regi
             <TextField className="col-md-6 mb-3" label="Time zone" required value={f.timezone} onChange={set('timezone')}
               error={fe('timezone')} hint="IANA zone, e.g. Asia/Manila" />
           </div>
+          <fieldset className="border rounded p-3 mb-3">
+            <legend className="float-none w-auto fs-6 px-1 mb-0">Ticket numbers</legend>
+            <div className="row">
+              <SelectField className="col-md-4 mb-2" label="Digits" value={String(f.ticketNumberDigits)}
+                onChange={(v) => set('ticketNumberDigits')(Number(v))} error={fe('ticketNumberDigits')}
+                options={[2, 3, 4, 5].map((d) => ({ value: String(d), label: String(d) }))} />
+              <SelectField className="col-md-4 mb-2" label="Separator" value={f.ticketNumberSeparator === '' ? 'none' : '-'}
+                onChange={(v) => set('ticketNumberSeparator')(v === 'none' ? '' : '-')} error={fe('ticketNumberSeparator')}
+                options={[{ value: '-', label: 'Hyphen (A-007)' }, { value: 'none', label: 'None (A007)' }]} />
+              <SelectField className="col-md-4 mb-2" label="Restart at 1" value={f.ticketNumberReset ?? 'DAILY'}
+                onChange={(v) => set('ticketNumberReset')(v as TicketNumberReset)} error={fe('ticketNumberReset')}
+                options={RESET_OPTIONS} />
+            </div>
+            <div className="small text-body-secondary">
+              Example: <strong>{sample}</strong>. Each service's prefix comes first. Changes apply to the next ticket;
+              a number already issued today is never repeated.
+            </div>
+          </fieldset>
           {site && <CheckField label="Active" checked={f.active} onChange={set('active')} />}
         </>
       )}

@@ -75,12 +75,16 @@ SYSTEM_MONITOR, SYNC_MANAGE`
 | POST | `/regions` | `{code, name}` → `Region` |
 | PUT | `/regions/{id}` | `{code, name, active}` → `Region` |
 | GET | `/sites?regionId=` | `Site[]` (only sites in caller scope) |
-| POST | `/sites` | `{code, name, type, regionId, area, timezone}` → `Site` |
-| PUT | `/sites/{id}` | `{code, name, type, regionId, area, timezone, active}` → `Site` |
+| POST | `/sites` | `{code, name, type, regionId, area, timezone, ticketNumberDigits?, ticketNumberSeparator?, ticketNumberReset?}` → `Site` |
+| PUT | `/sites/{id}` | same plus `active` → `Site`; omitted numbering fields keep their value |
 
 ```ts
 Region = { id; code; name; active: boolean }
-Site = { id; code; name; type: 'REGIONAL_OFFICE'|'LHIO'|'CENTRAL_OFFICE'; regionId; regionName; area?: string; timezone: string; active: boolean }
+Site = { id; code; name; type: 'REGIONAL_OFFICE'|'LHIO'|'CENTRAL_OFFICE'; regionId; regionName; area?: string; timezone: string; active: boolean;
+  ticketNumberDigits: 2..5 /*default 3*/; ticketNumberSeparator: '-'|'' /*default '-'*/;
+  ticketNumberReset: 'DAILY'|'WEEKLY'|'MONTHLY'|'YEARLY' /*default DAILY; weeks start Monday*/ }
+// Ticket number = service prefix + separator + zero-padded number, e.g. A-007 or A0007. A changed
+// schedule applies to the next ticket and never repeats a number already issued that day.
 ```
 
 ## Users and roles
@@ -93,6 +97,9 @@ Site = { id; code; name; type: 'REGIONAL_OFFICE'|'LHIO'|'CENTRAL_OFFICE'; region
 | POST | `/users/{id}/status` | `{status: 'ACTIVE'|'SUSPENDED'|'DEACTIVATED', reason}` → `User` |
 | PUT | `/users/{id}/assignments` | `AssignmentInput[]` → `User` |
 | POST | `/users/{id}/reset-password` | `{newPassword}` → 204 (user must change at next login) |
+| GET | `/users/{id}/sessions` | `UserSession[]` (needs `USER_MANAGE` over the user): live sign-ins, newest first |
+| DELETE | `/users/{id}/sessions/{sessionId}` | 204; ends one sign-in. Its access tokens are refused from the next request (401) |
+| DELETE | `/users/{id}/sessions` | 204; ends every sign-in of the user |
 | GET | `/roles` | `Role[]` |
 
 ```ts
@@ -100,7 +107,13 @@ User = { id; username; fullName; email; status: 'ACTIVE'|'SUSPENDED'|'DEACTIVATE
          lockedUntil?: string; lastLoginAt?: string; mustChangePassword: boolean; assignments: Assignment[] }
 AssignmentInput = { roleCode: string; regionId?: string; siteId?: string }
 Role = { code; name; scopeType: 'NATIONAL'|'REGION'|'SITE'; level: number; permissions: string[] }
+UserSession = { id; startedAt; lastActiveAt /*last token refresh*/; expiresAt; ipAddress?; userAgent?; current: boolean }
 ```
+
+Access tokens carry the sign-in session id (`sid`). A request with a token whose session was ended
+(sign-out, admin revoke, password change or reset, refresh-token reuse) gets 401 even before the
+token expires. `Me` includes `idleTimeoutMinutes` (`QMS_IDLE_TIMEOUT_MINUTES`, default 30, 0 = off):
+the portal warns one minute before and then signs out an inactive user.
 
 ## Service catalog, site services, priorities
 
@@ -113,6 +126,7 @@ Role = { code; name; scopeType: 'NATIONAL'|'REGION'|'SITE'; level: number; permi
 | GET | `/sites/{siteId}/services` | `SiteService[]` |
 | POST | `/sites/{siteId}/services` | `SiteServiceInput` → `SiteService` |
 | PUT | `/sites/{siteId}/services/{id}` | `SiteServiceInput` → `SiteService` |
+| POST | `/sites/{siteId}/services/add-catalog` | `{serviceItemIds?: string[]}` (omitted or empty = every active catalog service) → `SiteService[]` created. Services the site already has are skipped; each keeps its catalog prefix (or the next free one) and duration |
 | GET | `/priority-categories` | `PriorityCategory[]` |
 | POST | `/priority-categories` | `{code, name, description, rank, active}` |
 | PUT | `/priority-categories/{id}` | same |
@@ -220,13 +234,31 @@ QueueSnapshot = { siteId; businessDate; waiting: Ticket[]; called: Ticket[]; hel
 |---|---|---|
 | GET | `/kiosk/config` | `KioskConfig` |
 | POST | `/kiosk/tickets` | `{siteServiceId, priorityCategoryId?, channel, requestId /*client UUID, idempotent*/}` → `IssuedTicket` |
+| GET | `/kiosk/feedback-ticket?number=A-004` | `{ticketId, displayNumber, serviceName}` for today's COMPLETED ticket with that number and no feedback yet (separators and case ignored), else 404 |
 | POST | `/kiosk/feedback` | `{ticketId, rating /*1-5*/, comment?}` → 204 |
 
 ```ts
 KioskConfig = { site: { id; code; name }; services: { siteServiceId; name; description?; prefix; open: boolean; waitingCount; estimatedWaitMinutes }[];
-  priorityCategories: { id; code; name; description? }[]; content: Content[] }
-IssuedTicket = Ticket & { siteName: string; waitingAhead: number; estimatedWaitMinutes: number }
+  priorityCategories: { id; code; name; description? }[]; content: Content[];
+  ticketLinkBaseUrl?: string /*QMS_TICKET_LINK_BASE_URL; null = kiosk origin*/ }
+IssuedTicket = Ticket & { siteName: string; waitingAhead: number; estimatedWaitMinutes: number;
+  publicToken: string /*random, only in this response; QR code links to {base}/t/{publicToken}*/ }
 ```
+
+## Phone e-ticket (public; the link token is the only credential)
+
+| Method | Path | Notes |
+|---|---|---|
+| GET | `/public/tickets/{token}` | `PublicTicketStatus`; 404 for unknown, malformed or expired links (2 days after the business date) |
+| POST | `/public/tickets/{token}/feedback` | `{rating /*1-5*/, comment?}` → 204; 409 unless COMPLETED and not yet rated; rate-limited per client address |
+
+```ts
+PublicTicketStatus = { displayNumber; serviceName; siteName; status: TicketStatus; waitingAhead; estimatedWaitMinutes;
+  counterName? /*while CALLED*/; issuedAt; lastCalledAt?; feedbackOpen: boolean; feedbackGiven: boolean }
+```
+
+The server stores only the SHA-256 of the token, site-locally (not replicated). Each issue response,
+including an idempotent retry, carries a fresh token.
 
 ## Queue display (header `X-Device-Key`, device type DISPLAY)
 

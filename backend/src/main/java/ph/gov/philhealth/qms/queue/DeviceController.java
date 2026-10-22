@@ -6,9 +6,11 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import ph.gov.philhealth.qms.queue.QueueDtos.DisplayBoard;
 import ph.gov.philhealth.qms.queue.QueueDtos.FeedbackRequest;
+import ph.gov.philhealth.qms.queue.QueueDtos.FeedbackTicket;
 import ph.gov.philhealth.qms.queue.QueueDtos.IssueTicketRequest;
 import ph.gov.philhealth.qms.queue.QueueDtos.IssuedTicket;
 import ph.gov.philhealth.qms.queue.QueueDtos.KioskConfig;
@@ -23,13 +25,15 @@ public class DeviceController {
     private final QueueQueryService queries;
     private final FeedbackService feedback;
     private final TicketRepository tickets;
+    private final TicketLinkService links;
 
     public DeviceController(QueueService queue, QueueQueryService queries, FeedbackService feedback,
-                            TicketRepository tickets) {
+                            TicketRepository tickets, TicketLinkService links) {
         this.queue = queue;
         this.queries = queries;
         this.feedback = feedback;
         this.tickets = tickets;
+        this.links = links;
     }
 
     @GetMapping("/api/v1/kiosk/config")
@@ -48,7 +52,14 @@ public class DeviceController {
             t = tickets.findByRequestId(req.requestId()).filter(x -> x.getSiteId().equals(device.siteId()))
                     .orElseThrow(() -> e);
         }
-        return queries.issued(t);
+        return queries.issued(t).withPublicToken(links.newToken(t.getId()));
+    }
+
+    /** Kiosk "Rate our service": finds today's completed ticket by the number the client types. */
+    @GetMapping("/api/v1/kiosk/feedback-ticket")
+    public FeedbackTicket feedbackTicket(@RequestParam String number) {
+        Ticket t = links.completedToday(CurrentUser.device().siteId(), number);
+        return new FeedbackTicket(t.getId(), t.getDisplayNumber(), queries.issued(t).ticket().serviceName());
     }
 
     @PostMapping("/api/v1/kiosk/feedback")

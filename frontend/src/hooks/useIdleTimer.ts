@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 
-const ACTIVITY_EVENTS = ['pointerdown', 'keydown', 'touchstart', 'wheel'] as const;
+const ACTIVITY_EVENTS = ['pointerdown', 'pointermove', 'keydown', 'touchstart', 'wheel'] as const;
 
 /** Calls `onIdle` after `timeoutMs` without user interaction while `active` is true. */
 export function useIdleTimer(timeoutMs: number, onIdle: () => void, active = true): void {

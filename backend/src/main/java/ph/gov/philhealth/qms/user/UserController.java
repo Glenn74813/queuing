@@ -1,10 +1,12 @@
 package ph.gov.philhealth.qms.user;
 
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -13,9 +15,11 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import ph.gov.philhealth.qms.common.PageResponse;
+import ph.gov.philhealth.qms.security.JwtAuthenticationFilter;
 import ph.gov.philhealth.qms.user.UserDtos.AssignmentInput;
 import ph.gov.philhealth.qms.user.UserDtos.CreateUserRequest;
 import ph.gov.philhealth.qms.user.UserDtos.ResetPasswordRequest;
+import ph.gov.philhealth.qms.user.UserDtos.SessionDto;
 import ph.gov.philhealth.qms.user.UserDtos.RoleDto;
 import ph.gov.philhealth.qms.user.UserDtos.StatusRequest;
 import ph.gov.philhealth.qms.user.UserDtos.UpdateUserRequest;
@@ -66,6 +70,26 @@ public class UserController {
     @PreAuthorize("hasAuthority('USER_MANAGE')")
     public UserDto assignments(@PathVariable UUID id, @Valid @RequestBody List<@Valid AssignmentInput> req) {
         return service.replaceAssignments(id, req);
+    }
+
+    @GetMapping("/api/v1/users/{id}/sessions")
+    @PreAuthorize("hasAuthority('USER_MANAGE')")
+    public List<SessionDto> sessions(@PathVariable UUID id, HttpServletRequest http) {
+        return service.sessions(id, (UUID) http.getAttribute(JwtAuthenticationFilter.SESSION_ATTRIBUTE));
+    }
+
+    @DeleteMapping("/api/v1/users/{id}/sessions/{sessionId}")
+    @PreAuthorize("hasAuthority('USER_MANAGE')")
+    public ResponseEntity<Void> revokeSession(@PathVariable UUID id, @PathVariable UUID sessionId) {
+        service.revokeSessions(id, sessionId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @DeleteMapping("/api/v1/users/{id}/sessions")
+    @PreAuthorize("hasAuthority('USER_MANAGE')")
+    public ResponseEntity<Void> revokeAllSessions(@PathVariable UUID id) {
+        service.revokeSessions(id, null);
+        return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/api/v1/users/{id}/reset-password")

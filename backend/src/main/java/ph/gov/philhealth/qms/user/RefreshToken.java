@@ -24,4 +24,10 @@ public class RefreshToken {
     /** The token issued when this one was rotated. */
     private UUID replacedBy;
     private Instant createdAt;
+    /** Id of the login that started this rotation chain; shared by every token of the session. */
+    private UUID sessionId;
+    private Instant sessionStartedAt;
+    /** Client of the latest sign-in or refresh. */
+    private String ipAddress;
+    private String userAgent;
 }

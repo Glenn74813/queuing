@@ -57,6 +57,9 @@ the `docker compose` commands in the table below with `systemctl` / `journalctl 
 | Backup | `deploy/scripts/backup.sh` (nightly via `deploy/systemd/qms-backup.timer`). Copy files off-host. |
 | Restore | `docker compose stop api && deploy/scripts/restore.sh <file>.dump.gpg && docker compose start api` |
 | Upgrade | `docker compose pull` (or build), then `docker compose up -d`. Flyway applies migrations automatically at start. **Back up first.** |
+| Data retention | Daily at 02:15 (`QMS_RETENTION_CRON`). Tickets with their events and feedback older than `QMS_RETENTION_TICKET_DAYS`, and audit entries older than `QMS_RETENTION_AUDIT_DAYS`, are deleted; both default to 0 = keep forever until PhilHealth sets the policy (OI-13). Ticket retention below 31 days is refused, and a site node never deletes tickets whose changes have not reached central. Delivered sync entries (`QMS_RETENTION_SENT_OUTBOX_DAYS`, 30) and expired sign-in tokens (`QMS_RETENTION_EXPIRED_TOKEN_DAYS`, 30) are also cleaned. Each run that deletes something writes a `RETENTION_PURGE` audit entry with the counts. The database functions `qms_purge_tickets`/`qms_purge_audit` (V11) are the only way the application role can delete that history. |
+| Idle sign-out | `QMS_IDLE_TIMEOUT_MINUTES` (default 30; 0 = off). |
+| Phone e-ticket links | QR codes point at the kiosk's own address. If phones cannot reach it, set `QMS_TICKET_LINK_BASE_URL` to an address they can (it must serve this site node's portal and API). |
 | Rotate a kiosk/display key | Admin, then Devices, then Rotate key. Enter the new key on the device. |
 
 ## Monitoring
@@ -70,6 +73,16 @@ Example files are in [deploy/monitoring](../deploy/monitoring/): `prometheus.yml
 `qms-alerts.yml`, with 12 rules covering node down, errors, latency, the database pool, heap, disk,
 sync failures and backlog age, long queues, waiting clients with no agent, queue time, and failed
 scheduled reports. The thresholds are starting points to tune during the pilot.
+
+4. Import the Grafana dashboard
+   [deploy/monitoring/grafana/dashboards/qms-overview.json](../deploy/monitoring/grafana/dashboards/qms-overview.json)
+   ("PhilHealth QMS": service health, queues by site, waiting-time percentiles, agent sessions, sync
+   backlog, scheduled reports; filter by node). For provisioning, mount `grafana/provisioning` at
+   `/etc/grafana/provisioning` and `grafana/dashboards` at `/var/lib/grafana/dashboards/qms`.
+
+The rules and every dashboard query were checked with Prometheus 3.13.5 scraping a running node
+(`promtool check rules`; all 12 rules loaded with health `ok`). Grafana itself has not been run
+against them yet.
 
 ## Troubleshooting
 

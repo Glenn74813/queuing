@@ -40,13 +40,18 @@ public class JwtService {
         this.accessTtl = Duration.ofMinutes(props.security().accessTokenMinutes());
     }
 
-    public String issueAccessToken(UUID userId, String username) {
+    /** An authentic token: its user and the sign-in session it belongs to (null for pre-V11 tokens). */
+    public record Verified(UUID userId, UUID sessionId) {
+    }
+
+    public String issueAccessToken(UUID userId, String username, UUID sessionId) {
         Instant now = Instant.now();
         return Jwts.builder()
                 .id(Ids.newId().toString())
                 .issuer(ISSUER)
                 .subject(userId.toString())
                 .claim("username", username)
+                .claim("sid", sessionId.toString())
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(now.plus(accessTtl)))
                 .signWith(key, Jwts.SIG.HS256)
@@ -57,12 +62,13 @@ public class JwtService {
         return accessTtl.toSeconds();
     }
 
-    /** Returns the user id when the token is authentic, unexpired and issued by this system. */
-    public Optional<UUID> verify(String token) {
+    /** Returns the user and session when the token is authentic, unexpired and issued by this system. */
+    public Optional<Verified> verify(String token) {
         try {
             Claims claims = Jwts.parser().verifyWith(key).requireIssuer(ISSUER).build()
                     .parseSignedClaims(token).getPayload();
-            return Optional.of(UUID.fromString(claims.getSubject()));
+            String sid = claims.get("sid", String.class);
+            return Optional.of(new Verified(UUID.fromString(claims.getSubject()), sid != null ? UUID.fromString(sid) : null));
         } catch (JwtException | IllegalArgumentException e) {
             return Optional.empty();
         }

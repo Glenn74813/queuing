@@ -44,8 +44,15 @@ public final class UserDtos {
     public record SiteRef(UUID id, String code, String name) {
     }
 
+    /** idleTimeoutMinutes: the portal signs out after this much inactivity; 0 = never. */
     public record Me(UUID id, String username, String fullName, boolean mustChangePassword,
-                     Set<Permission> permissions, List<AssignmentDto> assignments, List<SiteRef> sites) {
+                     Set<Permission> permissions, List<AssignmentDto> assignments, List<SiteRef> sites,
+                     int idleTimeoutMinutes) {
+    }
+
+    /** A live sign-in session; {@code current} marks the caller's own. */
+    public record SessionDto(UUID id, Instant startedAt, Instant lastActiveAt, Instant expiresAt, String ipAddress,
+                             String userAgent, boolean current) {
     }
 
     public record TokenResponse(String accessToken, String refreshToken, long expiresIn, Me user) {

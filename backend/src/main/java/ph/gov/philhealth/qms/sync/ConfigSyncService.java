@@ -74,10 +74,14 @@ public class ConfigSyncService {
                 jdbc.query("select id, code, name, active from region where updated_at >= ?",
                         (rs, i) -> new ConfigBundle.RegionRow(rs.getObject(1, java.util.UUID.class), rs.getString(2),
                                 rs.getString(3), rs.getBoolean(4)), from),
-                jdbc.query("select id, code, name, type, region_id, area, timezone, active from site where updated_at >= ?",
+                jdbc.query("""
+                                select id, code, name, type, region_id, area, timezone, active, ticket_number_digits,
+                                       ticket_number_separator, ticket_number_reset
+                                from site where updated_at >= ?""",
                         (rs, i) -> new ConfigBundle.SiteRow(rs.getObject(1, java.util.UUID.class), rs.getString(2),
                                 rs.getString(3), rs.getString(4), rs.getObject(5, java.util.UUID.class),
-                                rs.getString(6), rs.getString(7), rs.getBoolean(8)), from),
+                                rs.getString(6), rs.getString(7), rs.getBoolean(8), rs.getInt(9), rs.getString(10),
+                                rs.getString(11)), from),
                 jdbc.query("""
                                 select id, code, name, description, classification, client_type, service_type, multi_stage,
                                        default_prefix, default_duration_minutes, required_documents, eligibility_notes,
@@ -220,12 +224,18 @@ public class ConfigSyncService {
         }
         for (var s : b.sites()) {
             jdbc.update("""
-                    insert into site (id, code, name, type, region_id, area, timezone, active, created_at, updated_at)
-                    values (?,?,?,?,?,?,?,?,now(),now())
+                    insert into site (id, code, name, type, region_id, area, timezone, active, ticket_number_digits,
+                        ticket_number_separator, ticket_number_reset, created_at, updated_at)
+                    values (?,?,?,?,?,?,?,?,coalesce(?, 3),coalesce(?, '-'),coalesce(?, 'DAILY'),now(),now())
                     on conflict (id) do update set code = excluded.code, name = excluded.name, type = excluded.type,
                         region_id = excluded.region_id, area = excluded.area, timezone = excluded.timezone,
-                        active = excluded.active, updated_at = now()
-                    """, s.id(), s.code(), s.name(), s.type(), s.regionId(), s.area(), s.timezone(), s.active());
+                        active = excluded.active,
+                        ticket_number_digits = coalesce(?, site.ticket_number_digits),
+                        ticket_number_separator = coalesce(?, site.ticket_number_separator),
+                        ticket_number_reset = coalesce(?, site.ticket_number_reset), updated_at = now()
+                    """, s.id(), s.code(), s.name(), s.type(), s.regionId(), s.area(), s.timezone(), s.active(),
+                    s.ticketNumberDigits(), s.ticketNumberSeparator(), s.ticketNumberReset(),
+                    s.ticketNumberDigits(), s.ticketNumberSeparator(), s.ticketNumberReset());
         }
         for (var i : b.serviceItems()) {
             jdbc.update("""

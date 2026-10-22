@@ -48,6 +48,11 @@ have not been assigned to one.
 After 5 wrong passwords the account is locked for 15 minutes ("Account temporarily locked"). There
 is no self-service "forgot password": an administrator must reset it (Users › **Reset password**).
 
+For security the portal signs you out after 30 minutes without keyboard, mouse or touch activity
+(the period is set per server). One minute before, "Are you still there?" appears: select
+**Stay signed in** to continue. The sign-in page then says "You were signed out after a period of
+inactivity".
+
 ## Servicing Agent: Agent Console
 
 ### Start a session
@@ -124,11 +129,11 @@ check box (or user **Status**) instead.
 
 | Page | What you can do |
 |---|---|
-| **Users** | Search by username, name or email. **New user**: username, full name, email, **Initial password** (must be changed at first login) and **Role assignments** (**Add assignment**; site roles need a site, regional roles a region); **Create user**. Per user: **Edit** (name, email), **Roles**, **Status** (Active / Suspended / Deactivated, with a reason), **Reset password** (sets a temporary password the user must change). Locked accounts show **LOCKED**. |
-| **Site Services** | **Add service**: pick a **Catalog service**, set **Ticket prefix** (1–3 capital letters, unique at the site), **Est. duration (min)**, **Sort order**, **Opens**/**Closes** (blank = all day), **Next stage (multi-stage flow)** (another service of the site; loops are rejected) and **Active**. Kiosks offer a service only while it is active and open. |
+| **Users** | Search by username, name or email. **New user**: username, full name, email, **Initial password** (must be changed at first login) and **Role assignments** (**Add assignment**; site roles need a site, regional roles a region); **Create user**. Per user: **Edit** (name, email), **Roles**, **Status** (Active / Suspended / Deactivated, with a reason), **Reset password** (sets a temporary password the user must change), **Sessions** (where the user is signed in: browser, address, sign-in time; **Sign out** ends one, **Sign out everywhere** ends all, effective immediately). Locked accounts show **LOCKED**. |
+| **Site Services** | **Add service**: pick a **Catalog service**, set **Ticket prefix** (1–3 capital letters, unique at the site), **Est. duration (min)**, **Sort order**, **Opens**/**Closes** (blank = all day), **Next stage (multi-stage flow)** (another service of the site; loops are rejected) and **Active**. Kiosks offer a service only while it is active and open. **Add all catalog services (n)** adds every active catalog service the site does not offer yet, after a confirmation; each keeps its catalog prefix (or gets the next free letter) and estimated duration. |
 | **Counters** | **New counter**: **Code**, **Name** (announced on the display, e.g. "Counter 3"), **Eligible services** (at least one) and **Active**. The list shows the agent currently at each counter. |
 | **Devices** | **Register device**: **Code**, **Name**, **Type** (KIOSK or DISPLAY), then **Register**. The API key is shown once: use **Copy**, then **I have saved the key**. **Rotate key** issues a new key and stops the old one immediately. **Edit** changes the name or deactivates the device. **Last seen** shows when the device last contacted the server. |
-| **Regions & Sites** | Central and regional administrators: **New region**, **New site** (code, name, type, region, area, time zone). Do not create regions or sites on a synchronized site node ([sync-design.md](sync-design.md)). |
+| **Regions & Sites** | Central and regional administrators: **New region**, **New site** (code, name, type, region, area, time zone, and **Ticket numbers**: **Digits** 2–5, **Separator** hyphen or none, **Restart at 1** every day / Monday / month / year; the form shows an example such as A-007). A change applies to the next ticket and never repeats a number already issued that day. Do not create regions or sites on a synchronized site node ([sync-design.md](sync-design.md)). |
 | **Service Catalog**, **Priority Categories** | Central administrators: national services (classification, client and service type, default prefix and duration, multi-stage, documents, eligibility) and priority lanes (**Rank**: lower is served first, 100 is the regular lane). |
 
 ## Content (announcements and media)
@@ -247,7 +252,13 @@ example `TICKET_VOID`) and select **Apply**. **Export CSV** downloads the filter
 * **Kiosk** (`/kiosk`): the client chooses a service under "Please select a service" (with waiting
   count and estimated wait), then a priority lane or **Regular**, then **Print ticket** or **Show on screen only**
   ("Take a photo of your number"). The number is shown with **Print again** and
-  **Done**.
+  **Done**, and a QR code: "Scan with your phone to follow your place in line and rate our service
+  afterwards". The printed ticket carries the same QR code.
+* **Phone ticket** (`/t/<code>`, opened from the QR code): the number, how many are ahead and the
+  estimated wait, updated every 15 seconds; "Now calling! Please proceed to Counter 1" when called;
+  after the transaction, "How was our service today?" (once per ticket). The link stops working two
+  days later. Phones must be able to reach the site server (for example on the office guest Wi-Fi),
+  or set `QMS_TICKET_LINK_BASE_URL` to an address they can reach.
 * **Display** (`/display`): called numbers and counters. Each call (and each recall) plays a chime
   followed by a voice announcement, e.g. "Ticket number A, 0, 0, 4, please proceed to Counter 1."
   (English; a Philippine-English voice is used when the device has one). The voice is on by default;
@@ -255,5 +266,7 @@ example `TICKET_VOID`) and select **Apply**. **Export CSV** downloads the filter
   mute a page until someone interacts with it: if the display shows "Tap or click anywhere on this
   screen to turn on the call announcements", tap once. Display PCs set up per
   [kiosk-lockdown.md](kiosk-lockdown.md) (`--autoplay-policy=no-user-gesture-required`) do not need the tap.
-* **Feedback** (`/feedback/<ticketId>` on a kiosk): "How was our service today?" with a 1–5 rating
-  and an optional comment. No screen links to this page yet; it must be opened by URL.
+* **Feedback at the kiosk**: **Rate our service** on the kiosk home screen. The client types the
+  number on their ticket with the on-screen keys, then **Continue**; "How was our service today?"
+  takes a 1–5 rating and an optional comment and returns to the home screen after "Thank you!". Only
+  today's finished transactions that have not been rated are accepted.

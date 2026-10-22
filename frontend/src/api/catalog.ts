@@ -20,6 +20,9 @@ export const catalogApi = {
   listSiteServices: (siteId: string) => api.get<SiteService[]>(`/sites/${siteId}/services`).then((r) => r.data),
   createSiteService: (siteId: string, body: SiteServiceInput) =>
     api.post<SiteService>(`/sites/${siteId}/services`, body).then((r) => r.data),
+  /** Adds every active catalog service the site does not offer yet; returns the services created. */
+  addCatalogServices: (siteId: string) =>
+    api.post<SiteService[]>(`/sites/${siteId}/services/add-catalog`, {}).then((r) => r.data),
   updateSiteService: (siteId: string, id: string, body: SiteServiceInput) =>
     api.put<SiteService>(`/sites/${siteId}/services/${id}`, body).then((r) => r.data),
 

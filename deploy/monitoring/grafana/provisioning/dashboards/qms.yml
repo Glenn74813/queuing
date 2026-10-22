@@ -1,0 +1,11 @@
+# Grafana provisioning: loads the QMS dashboard from /var/lib/grafana/dashboards/qms (mount
+# deploy/monitoring/grafana/dashboards there). See docs/operations.md, "Monitoring".
+apiVersion: 1
+providers:
+  - name: qms
+    folder: PhilHealth QMS
+    type: file
+    disableDeletion: true
+    allowUiUpdates: false
+    options:
+      path: /var/lib/grafana/dashboards/qms

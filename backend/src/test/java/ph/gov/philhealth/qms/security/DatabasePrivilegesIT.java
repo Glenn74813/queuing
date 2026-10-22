@@ -54,4 +54,13 @@ class DatabasePrivilegesIT {
         assertThatThrownBy(() -> asAppRole(() -> jdbc.execute("drop table ticket")))
                 .rootCause().hasMessageContaining("must be owner");
     }
+
+    @Test
+    void applicationRolePurgesHistoryOnlyThroughTheRetentionFunctions() {
+        asAppRole(() -> {
+            assertThat(jdbc.queryForObject("select qms_purge_audit(now() - interval '100 years', 10)", Integer.class))
+                    .isZero();
+            assertThat(jdbc.queryForObject("select qms_purge_tickets(current_date - 36500, 10)", Integer.class)).isZero();
+        });
+    }
 }

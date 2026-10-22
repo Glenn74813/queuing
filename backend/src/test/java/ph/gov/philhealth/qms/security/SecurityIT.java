@@ -123,6 +123,12 @@ class SecurityIT {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(data.json(Map.of("currentPassword", "Another-Pass-77", "newPassword", "Brand-New-Pass-88"))))
                 .andExpect(status().isNoContent());
+        // Changing the password ends every session, this one included; the user signs in again.
+        mvc.perform(get("/api/v1/sites/" + site.siteId() + "/queue").header("Authorization", "Bearer " + token))
+                .andExpect(status().isUnauthorized());
+        token = data.read(mvc.perform(post("/api/v1/auth/login").contentType(MediaType.APPLICATION_JSON)
+                        .content(data.json(Map.of("username", agent.get("username"), "password", "Brand-New-Pass-88"))))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString()).get("accessToken").asText();
         mvc.perform(get("/api/v1/sites/" + site.siteId() + "/queue").header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk());
 

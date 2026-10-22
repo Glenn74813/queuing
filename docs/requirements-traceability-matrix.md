@@ -37,7 +37,7 @@ Section numbers refer to the project development prompt or specification.
 | R-4.3 | Hierarchical user administration | `UserService.requireCanGrant` | `SecurityIT.hierarchicalUserAdministration` | Built+Tested | Pending |
 | R-4.4 | Activation, suspension, deactivation and status tracking | `UserService.setStatus` | `SecurityIT` (suspension takes effect immediately) | Built+Tested | Pending |
 | R-4.5 | Account recovery and password reset | Admin reset plus forced change | `SecurityIT` (forced change) | Partial: no self-service recovery (OI-19) | – |
-| R-4.6 | Session and token lifecycle | Access/refresh tokens, rotation, logout, revoke on password/role/status change | `SecurityIT.refreshTokensRotateAndReuseIsDetected` | Built+Tested | Pending |
+| R-4.6 | Session and token lifecycle | Access/refresh tokens, rotation, logout, revoke on password/role/status change; sign-in sessions listed and ended by administrators (Users › Sessions), with access tokens refused as soon as their session ends (V11); idle sign-out with one-minute warning (`QMS_IDLE_TIMEOUT_MINUTES`) | `SecurityIT.refreshTokensRotateAndReuseIsDetected`, `SessionIT`, `IdleSignOut` unit tests | Built+Tested | Pending |
 | R-4.7 | Configurable approval workflows | CMS only | – | Partial (OI-18) | – |
 | R-4.8 | Audit of user/permission/admin actions | `AuditService` | `SecurityIT` checks the audit rows | Built+Tested | Pending |
 
@@ -47,8 +47,8 @@ Section numbers refer to the project development prompt or specification.
 |---|---|---|---|---|---|
 | R-5.1.1 | Unique ticket numbers; no conflicts under concurrency | `TicketNumberAllocator`, unique constraints | `ConcurrencyIT` | Built+Tested | Pending |
 | R-5.1.2 | Printed tickets via kiosk thermal printers | Browser print, 80 mm stylesheet | Frontend unit tests only; no printer tested | Partial (OI-15) | – |
-| R-5.1.3 | Electronic ticketing | Kiosk "show on screen only" (channel ELECTRONIC) | `QueueFlowIT` (channel field) | Partial (OI-23) | – |
-| R-5.1.4 | Prefixes, numbering, operating hours, reset schedule | Per-site prefix, daily reset by business date, open/close time | `QueueFlowIT` (numbering) | Partial: reset is daily only; hours not covered by a test | Pending |
+| R-5.1.3 | Electronic ticketing | Kiosk "show on screen only" (channel ELECTRONIC); every ticket (screen and print) has a QR code to a public phone page (`/t/{token}`: position, estimated wait, "proceed to counter", feedback); random 128-bit token stored hashed, site-local, expires 2 days after the business date | `NumberingAndPhoneTicketIT.phoneLinkShowsProgressAndTakesFeedbackOnce`, `QrCode` unit test | Partial: no SMS (OI-23); phones must reach the site server (`QMS_TICKET_LINK_BASE_URL`) | – |
+| R-5.1.4 | Prefixes, numbering, operating hours, reset schedule | Per-service prefix; per-site number format (2–5 digits, hyphen or none) and reset schedule (daily, weekly, monthly, yearly) in Regions & Sites, synced to site nodes; open/close time | `QueueFlowIT` (numbering), `NumberingAndPhoneTicketIT` (format, monthly reset without repeating the day's numbers) | Built+Tested; operating hours not covered by a test | Pending |
 | R-5.1.5 | Ticket linked to site, service, dispenser, date and status | `ticket` columns | `QueueFlowIT` | Built+Tested | Pending |
 | R-5.1.6 | Configurable priorities and multi-stage workflows | Priority rank; transfer with stage_no | `QueueFlowIT` | Built+Tested | Pending (OI-06) |
 | R-5.2.1 | Create/modify/activate/reorder services without code changes | Catalog and site-service APIs and admin UI | API built; no IT for catalog CRUD | Built | Pending |
@@ -67,7 +67,7 @@ Section numbers refer to the project development prompt or specification.
 
 | ID | Requirement | Implementation | Test / evidence | Status | Acceptance |
 |---|---|---|---|---|---|
-| R-6.1 | Kiosk: configurable services, touch, print, priority flow, announcements, error handling, idle reset, offline from central | `KioskPage`, `/kiosk/*` | Frontend unit tests; API in `QueueFlowIT` | Built | Pending (OI-15, OI-16) |
+| R-6.1 | Kiosk: configurable services, touch, print, priority flow, announcements, error handling, idle reset, offline from central | `KioskPage`, `/kiosk/*`; **Rate our service** on the home screen (on-screen keypad, finds today's completed ticket, then the feedback page) | Frontend unit tests; API in `QueueFlowIT`, `NumberingAndPhoneTicketIT.kioskFindsTodaysCompletedTicketByNumber` | Built | Pending (OI-15, OI-16) |
 | R-6.1.1 | Prevent access to OS functions | `docs/kiosk-lockdown.md` (Windows and Ubuntu procedures, verification checklist) | Not validated on hardware | Partial (OI-16) | – |
 | R-6.2 | Display: now serving, recent calls, counters, audio, media rotation, scheduling, full screen, auto-recovery | `DisplayPage`, `/display/board`, WebSocket | `QueueFlowIT` (board API); frontend tests | Built | Pending (OI-17) |
 | R-6.2.1 | Layouts based on PhilHealth templates | – | – | Blocked: templates not provided | – |
@@ -109,10 +109,11 @@ Section numbers refer to the project development prompt or specification.
 
 | ID | Requirement | Implementation | Test / evidence | Status | Acceptance |
 |---|---|---|---|---|---|
-| R-11.1 | Indexing, pooling, pagination, efficient broadcast, background jobs | Partial indexes, Hikari, paged APIs, topic per site | – | Built | Pending |
+| R-11.1 | Indexing, pooling, pagination, efficient broadcast, background jobs | Partial indexes, Hikari, paged APIs, topic per site | – | Built; WebSocket uses Spring's in-memory broker, so more than one central API instance needs a broker relay or sticky sessions (gap B1) | Pending |
 | R-11.2 | Capacity and load testing, SLOs | – | – | Blocked (OI-01, OI-02) | – |
-| R-11.3 | Monitoring of CPU, memory, latency, DB | Prometheus endpoint (token-protected) with QMS queue/sync/report metrics and JVM/HTTP/DB/disk metrics; 12 alert rules and a scrape config in `deploy/monitoring` | `MetricsIT`; live scrape verified that every metric used by the rules exists | Partial: no dashboards; alert rules not yet run in a Prometheus server | Pending |
+| R-11.3 | Monitoring of CPU, memory, latency, DB | Prometheus endpoint (token-protected) with QMS queue/sync/report metrics and JVM/HTTP/DB/disk metrics; 12 alert rules and a scrape config in `deploy/monitoring`; Grafana dashboard `deploy/monitoring/grafana/dashboards/qms-overview.json` (17 panels) with provisioning files | `MetricsIT`; Prometheus 3.13.5 scraping a live node loaded all 12 rules (health ok) and ran every dashboard query | Built+Tested; Grafana not yet run with the dashboard | Pending |
 | R-12.x | Security controls (see `security.md`) | Multiple, including DB least privilege and append-only audit (V3) | `SecurityIT`, `DatabasePrivilegesIT` | Built+Tested (core controls) | Pending |
+| R-12.r | Data retention and disposal (Data Privacy Act) | `RetentionJob` (daily): tickets with events and feedback, audit entries, delivered sync entries, expired tokens; owner-defined purge functions (V11) are the application's only way to delete history; never purges unsynced site data; audited | `RetentionIT`, `DatabasePrivilegesIT` | Built+Tested; periods default to "keep forever" until PhilHealth decides (OI-13) | Blocked (OI-13) |
 | R-12.v | Third-party VAPT | – | – | Not done (OI-22) | – |
 | R-12.d | Dependency vulnerability scanning | `.github/workflows/ci.yml` (OWASP Dependency-Check profile `security-scan`, `npm audit`), Dependabot | `npm audit` run: production deps clean after upgrades (see `security.md`) | Partial: CI not yet activated; backend scan needs an NVD API key | – |
 
@@ -120,11 +121,11 @@ Section numbers refer to the project development prompt or specification.
 
 | ID | Requirement | Implementation | Test / evidence | Status | Acceptance |
 |---|---|---|---|---|---|
-| R-13 | Admin UIs: users, org, catalog, numbering, counters, priorities, CMS, audit, sync, system health | `frontend/src/pages/admin/*` | Frontend build; not exercised end to end | Partial: no report-template, integration-endpoint or backup-status admin screens | – |
+| R-13 | Admin UIs: users, org, catalog, numbering, counters, priorities, CMS, audit, sync, system health | `frontend/src/pages/admin/*` (ticket numbering in Regions & Sites; user sessions; bulk "Add all catalog services") | Frontend build; not exercised end to end | Partial: no report-template, integration-endpoint or backup-status admin screens | – |
 | R-14.1 | Source, migrations, API docs, env templates, build instructions | Repository | – | Built | Pending |
 | R-14.2 | User and administrator manuals, troubleshooting guide | `user-guide.md` (agents, supervisors, administrators, reporting), `operations.md`, `deploy/native/README.md` | Written from the implemented screens; not reviewed by PhilHealth users | Built | Pending |
 | R-14.3 | Architecture and DB diagrams | `architecture.md`, `sync-design.md`, `database.md` (ER diagram, data dictionary) | Diagram cross-checked against the migration SQL; Mermaid not rendered locally | Built | Pending |
-| R-15 | Automated unit/integration/API/frontend tests | 45 backend, 47 frontend, 14 browser end-to-end (Playwright); manual browser smoke test (see test-plan) | Passing | Partial: no E2E, load or security scans (see `test-plan.md`) | – |
+| R-15 | Automated unit/integration/API/frontend tests | 60 backend, 65 frontend, 15 browser end-to-end (Playwright); manual browser smoke test (see test-plan) | Passing | Partial: no load tests, cross-browser runs or third-party security scans (see `test-plan.md`) | – |
 | R-16 | Two-year warranty, 120 man-hours, 24/7 on-call, SLA | – | – | Process (OI-21) | – |
 | R-17 | Training and knowledge transfer | – | – | Process | – |
 | R-18 | Layered code, transactions, server-side validation, central error handling, migrations, health checks | Throughout | Code review | Built | Pending |

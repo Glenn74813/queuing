@@ -1,6 +1,8 @@
 package ph.gov.philhealth.qms.org;
 
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
@@ -19,6 +21,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import ph.gov.philhealth.qms.audit.AuditService;
 import ph.gov.philhealth.qms.common.ApiException;
+import ph.gov.philhealth.qms.queue.TicketNumberAllocator;
 import ph.gov.philhealth.qms.security.CurrentUser;
 import ph.gov.philhealth.qms.security.Permission;
 import ph.gov.philhealth.qms.security.ScopeService;
@@ -39,13 +42,17 @@ public class OrgController {
     }
 
     public record SiteDto(UUID id, String code, String name, Site.Type type, UUID regionId, String regionName,
-                          String area, String timezone, boolean active) {
+                          String area, String timezone, boolean active, int ticketNumberDigits,
+                          String ticketNumberSeparator, TicketNumberAllocator.Reset ticketNumberReset) {
     }
 
     public record SiteInput(@NotBlank @Size(max = 20) @Pattern(regexp = "^[A-Z0-9_-]+$") String code,
                             @NotBlank @Size(max = 150) String name, @NotNull Site.Type type,
                             @NotNull UUID regionId, @Size(max = 100) String area,
-                            @NotBlank String timezone, Boolean active) {
+                            @NotBlank String timezone, Boolean active,
+                            @Min(2) @Max(5) Integer ticketNumberDigits,
+                            @Pattern(regexp = "^-?$") String ticketNumberSeparator,
+                            TicketNumberAllocator.Reset ticketNumberReset) {
     }
 
     private final RegionRepository regions;
@@ -152,10 +159,21 @@ public class OrgController {
         if (in.active() != null) {
             s.setActive(in.active());
         }
+        // Omitted numbering fields keep the current setting (older clients do not send them).
+        if (in.ticketNumberDigits() != null) {
+            s.setTicketNumberDigits(in.ticketNumberDigits());
+        }
+        if (in.ticketNumberSeparator() != null) {
+            s.setTicketNumberSeparator(in.ticketNumberSeparator());
+        }
+        if (in.ticketNumberReset() != null) {
+            s.setTicketNumberReset(in.ticketNumberReset());
+        }
     }
 
     static SiteDto toDto(Site s) {
         return new SiteDto(s.getId(), s.getCode(), s.getName(), s.getType(), s.getRegionId(),
-                s.getRegion() != null ? s.getRegion().getName() : null, s.getArea(), s.getTimezone(), s.isActive());
+                s.getRegion() != null ? s.getRegion().getName() : null, s.getArea(), s.getTimezone(), s.isActive(),
+                s.getTicketNumberDigits(), s.getTicketNumberSeparator(), s.getTicketNumberReset());
     }
 }
