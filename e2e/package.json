@@ -1,0 +1,17 @@
+{
+  "name": "qms-e2e",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Playwright browser end-to-end tests for the PhilHealth Queueing Management System",
+  "scripts": {
+    "test": "playwright test",
+    "test:local": "bash scripts/run-local.sh",
+    "typecheck": "tsc --noEmit",
+    "report": "playwright show-report"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.64.0",
+    "@types/node": "20.19.43",
+    "typescript": "5.9.3"
+  }
+}

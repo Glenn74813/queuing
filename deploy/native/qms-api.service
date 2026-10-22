@@ -1,0 +1,47 @@
+# PhilHealth QMS API (native, non-Docker install). Installed by install-native.sh as
+# /etc/systemd/system/qms-api.service. Configuration: /etc/philhealth-qms/qms.env
+[Unit]
+Description=PhilHealth QMS API
+After=network-online.target postgresql.service postgresql-17.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=qms
+Group=qms
+WorkingDirectory=/opt/philhealth-qms
+EnvironmentFile=/etc/philhealth-qms/qms.env
+# $JAVA_OPTS (unbraced) is split on whitespace into separate JVM arguments.
+ExecStart=/usr/bin/java $JAVA_OPTS -jar /opt/philhealth-qms/app/qms-backend.jar
+# Spring Boot exits with 143 on SIGTERM; treat that as a clean stop.
+SuccessExitStatus=143
+TimeoutStopSec=60
+Restart=on-failure
+RestartSec=10
+UMask=0027
+
+# ---- Hardening ----
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadWritePaths=/opt/philhealth-qms/data
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictSUIDSGID=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+LockPersonality=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+# MemoryDenyWriteExecute= is deliberately NOT set: the JVM's JIT compiler must map memory that is
+# both writable and executable, and the JVM fails or falls back to the interpreter under W^X.
+
+[Install]
+WantedBy=multi-user.target

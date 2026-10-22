@@ -1,0 +1,23 @@
+spring:
+  flyway:
+    locations: classpath:db/migration,classpath:db/testcallback
+    placeholders:
+      appRole: qms_app_test
+qms:
+  node:
+    role: SITE
+    site-code: TEST
+  security:
+    # Test-only key (base64 of 32 bytes); never use outside automated tests.
+    jwt-secret: dGVzdC1vbmx5LWtleS1kby1ub3QtdXNlLWluLXByb2QhIQ==
+    cors-allowed-origins: https://qms.example.test
+    login-rate-per-minute: 1000
+    metrics-token: test-metrics-token-0123456789abcdef
+  storage:
+    media-dir: ${java.io.tmpdir}/qms-test-media
+    reports-dir: ${java.io.tmpdir}/qms-test-reports
+  queue:
+    expire-cron: "-"
+logging:
+  level:
+    org.flywaydb: warn

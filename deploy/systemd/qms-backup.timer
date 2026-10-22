@@ -1,0 +1,9 @@
+[Unit]
+Description=Nightly PhilHealth QMS backup
+
+[Timer]
+OnCalendar=*-*-* 20:00:00 Asia/Manila
+Persistent=true
+
+[Install]
+WantedBy=timers.target

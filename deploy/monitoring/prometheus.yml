@@ -1,0 +1,22 @@
+# Example Prometheus configuration for QMS nodes. Adapt targets to PhilHealth's monitoring setup.
+# Each node's API exposes /actuator/prometheus on its internal port 8080; the public nginx proxy
+# blocks it, so Prometheus must reach the API on the internal network (or via a VPN/WAN path to
+# each site). Authentication: the node's QMS_METRICS_TOKEN as a bearer token.
+global:
+  scrape_interval: 30s
+  evaluation_interval: 30s
+
+rule_files:
+  - qms-alerts.yml
+
+scrape_configs:
+  - job_name: qms
+    metrics_path: /actuator/prometheus
+    authorization:
+      type: Bearer
+      credentials_file: /etc/prometheus/secrets/qms-metrics-token   # one shared token, or one job per node
+    static_configs:
+      - targets: ['qms-central.internal:8080']
+        labels: { role: central }
+      - targets: ['lhio-0001.internal:8080', 'lhio-0002.internal:8080']   # ... one per site node
+        labels: { role: site }

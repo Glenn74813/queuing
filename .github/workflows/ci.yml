@@ -1,0 +1,191 @@
+# Build, test and scan on every push and pull request. Adapt to PhilHealth's CI platform
+# (GitLab CI / Jenkins) if GitHub Actions is not used; the commands are the same.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "0 18 * * 0"   # weekly re-scan for newly published CVEs (Monday 02:00 Asia/Manila)
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      - name: Build and test (unit + integration, embedded PostgreSQL)
+        working-directory: backend
+        run: mvn -B verify
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: backend-test-reports
+          path: backend/target/surefire-reports
+
+  backend-security-scan:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      - name: OWASP Dependency-Check (fails on CVSS >= 7)
+        working-directory: backend
+        env:
+          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+        run: mvn -B -Psecurity-scan -DskipTests verify
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dependency-check-report
+          path: backend/target/dependency-check-report.*
+
+  frontend:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20.18"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - working-directory: frontend
+        run: npm ci
+      - name: Unit tests
+        working-directory: frontend
+        run: npm test -- --run
+      - name: Type check and build
+        working-directory: frontend
+        run: npm run build
+      - name: Dependency audit (fails on high/critical)
+        working-directory: frontend
+        run: npm audit --omit=dev --audit-level=high
+
+  images:
+    needs: [backend, frontend]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t philhealth/qms-backend:ci backend
+      - run: docker build -t philhealth/qms-frontend:ci frontend
+
+  e2e:
+    # Browser end-to-end tests (Playwright, e2e/) against the real backend + PostgreSQL and the Vite dev server.
+    needs: [backend, frontend]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: qms_owner
+          POSTGRES_PASSWORD: e2e-owner-pass
+          POSTGRES_DB: qms_e2e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U qms_owner -d qms_e2e"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      CI: "true"
+      PGHOST: localhost
+      PGPORT: "5432"
+      PG_OWNER: qms_owner
+      PG_OWNER_PASSWORD: e2e-owner-pass
+      APP_DB_USER: qms_e2e_app
+      APP_DB_PASSWORD: e2epass
+      E2E_BASE_URL: http://localhost:5180
+      E2E_API_URL: http://localhost:8095/api/v1
+      E2E_BOOTSTRAP_PASSWORD: E2e-Bootstrap-Pass-1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20.18"
+          cache: npm
+          cache-dependency-path: |
+            frontend/package-lock.json
+            e2e/package-lock.json
+      - name: Build backend jar
+        working-directory: backend
+        run: mvn -B -DskipTests package
+      - name: Create the application database role
+        env:
+          PGPASSWORD: ${{ env.PG_OWNER_PASSWORD }}
+        run: |
+          psql -v ON_ERROR_STOP=1 -h "$PGHOST" -p "$PGPORT" -U "$PG_OWNER" -d qms_e2e <<SQL
+          CREATE ROLE $APP_DB_USER LOGIN PASSWORD '$APP_DB_PASSWORD';
+          GRANT CONNECT ON DATABASE qms_e2e TO $APP_DB_USER;
+          GRANT USAGE ON SCHEMA public TO $APP_DB_USER;
+          SQL
+      - name: Start backend on :8095
+        run: |
+          mkdir -p "$RUNNER_TEMP/qms/media" "$RUNNER_TEMP/qms/reports"
+          QMS_PORT=8095 \
+          QMS_DB_URL="jdbc:postgresql://$PGHOST:$PGPORT/qms_e2e" \
+          QMS_DB_USER="$APP_DB_USER" \
+          QMS_DB_PASSWORD="$APP_DB_PASSWORD" \
+          SPRING_FLYWAY_USER="$PG_OWNER" \
+          SPRING_FLYWAY_PASSWORD="$PG_OWNER_PASSWORD" \
+          QMS_JWT_SECRET="$(openssl rand -base64 48)" \
+          QMS_CORS_ORIGINS="$E2E_BASE_URL" \
+          QMS_SITE_CODE=E2E \
+          QMS_BOOTSTRAP_ADMIN_PASSWORD="$E2E_BOOTSTRAP_PASSWORD" \
+          QMS_MEDIA_DIR="$RUNNER_TEMP/qms/media" \
+          QMS_REPORTS_DIR="$RUNNER_TEMP/qms/reports" \
+          QMS_LOGIN_RATE_PER_MINUTE=1000 \
+            nohup java -jar backend/target/qms-backend.jar > "$RUNNER_TEMP/backend.log" 2>&1 &
+          for i in $(seq 1 120); do
+            if curl -fsS http://localhost:8095/actuator/health | grep -q '"UP"'; then echo "backend up after ${i}s"; exit 0; fi
+            sleep 1
+          done
+          echo "backend did not start"; tail -n 100 "$RUNNER_TEMP/backend.log"; exit 1
+      - name: Start frontend (Vite dev server) on :5180
+        working-directory: frontend
+        run: |
+          npm ci
+          QMS_API_TARGET=http://localhost:8095 nohup npx vite --port 5180 --strictPort > "$RUNNER_TEMP/frontend.log" 2>&1 &
+          for i in $(seq 1 60); do
+            if curl -fsS http://localhost:5180/ | grep -q 'id="root"'; then echo "vite up after ${i}s"; exit 0; fi
+            sleep 1
+          done
+          echo "vite did not start"; tail -n 50 "$RUNNER_TEMP/frontend.log"; exit 1
+      - name: Install Playwright and Chromium
+        working-directory: e2e
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+      - name: Run E2E tests
+        working-directory: e2e
+        env:
+          E2E_BROWSER_CHANNEL: ""
+        run: npx playwright test
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: |
+            e2e/playwright-report
+            e2e/test-results
+          retention-days: 14
+      - name: Server logs on failure
+        if: failure()
+        run: |
+          tail -n 200 "$RUNNER_TEMP/backend.log" || true
+          tail -n 50 "$RUNNER_TEMP/frontend.log" || true

@@ -1,0 +1,7 @@
+[Unit]
+Description=PhilHealth QMS encrypted backup
+
+[Service]
+Type=oneshot
+EnvironmentFile=/opt/philhealth-qms/deploy/env/backup.env
+ExecStart=/opt/philhealth-qms/deploy/scripts/backup.sh

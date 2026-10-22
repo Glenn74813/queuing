@@ -1,0 +1,105 @@
+# Alert rules for the PhilHealth QMS. Thresholds are initial proposals; tune them during the pilot
+# and align severities with the incident classification in the approved SLA.
+groups:
+  - name: qms-availability
+    rules:
+      - alert: QmsNodeDown
+        expr: up{job="qms"} == 0
+        for: 5m
+        labels: { severity: critical }
+        annotations:
+          summary: "QMS node {{ $labels.instance }} is not responding"
+          description: "Prometheus cannot scrape the QMS API for 5 minutes. Kiosks, displays and agents at this site are likely affected."
+
+      - alert: QmsHighServerErrorRate
+        expr: |
+          sum by (instance) (rate(http_server_requests_seconds_count{job="qms", status=~"5.."}[5m]))
+            / sum by (instance) (rate(http_server_requests_seconds_count{job="qms"}[5m])) > 0.05
+        for: 10m
+        labels: { severity: serious }
+        annotations:
+          summary: "More than 5% of requests fail with server errors on {{ $labels.instance }}"
+
+      - alert: QmsSlowApi
+        expr: |
+          histogram_quantile(0.95, sum by (instance, le) (rate(http_server_requests_seconds_bucket{job="qms", uri!~"/ws.*"}[10m]))) > 2
+        for: 15m
+        labels: { severity: warning }
+        annotations:
+          summary: "95th percentile API response time above 2 s on {{ $labels.instance }}"
+
+  - name: qms-resources
+    rules:
+      - alert: QmsDatabasePoolExhausted
+        expr: max by (instance) (hikaricp_connections_pending{job="qms"}) > 0
+        for: 5m
+        labels: { severity: serious }
+        annotations:
+          summary: "Requests are waiting for database connections on {{ $labels.instance }}"
+
+      - alert: QmsJvmHeapHigh
+        expr: |
+          sum by (instance) (jvm_memory_used_bytes{job="qms", area="heap"})
+            / sum by (instance) (jvm_memory_max_bytes{job="qms", area="heap"}) > 0.9
+        for: 15m
+        labels: { severity: warning }
+        annotations:
+          summary: "JVM heap above 90% on {{ $labels.instance }}"
+
+      - alert: QmsDiskSpaceLow
+        expr: disk_free_bytes{job="qms"} / disk_total_bytes{job="qms"} < 0.1
+        for: 15m
+        labels: { severity: serious }
+        annotations:
+          summary: "Less than 10% disk space left on {{ $labels.instance }} (media, reports, logs)"
+
+  - name: qms-synchronization
+    rules:
+      - alert: QmsSyncFailures
+        expr: qms_sync_outbox_entries{job="qms", status="failed"} > 0
+        for: 30m
+        labels: { severity: warning }
+        annotations:
+          summary: "{{ $value }} sync entries keep failing on {{ $labels.instance }}"
+          description: "Check System & Sync → Sync outbox for the lastError. Local queue operation is unaffected."
+
+      - alert: QmsSyncBacklogOld
+        expr: qms_sync_outbox_oldest_pending_age_seconds{job="qms"} > 3600 * 4
+        for: 15m
+        labels: { severity: serious }
+        annotations:
+          summary: "Records from {{ $labels.instance }} have not reached central for over 4 hours"
+          description: "Usually a WAN outage or an invalid site key. Central reports for this site are incomplete until it clears."
+
+  - name: qms-service
+    rules:
+      - alert: QmsLongQueue
+        expr: qms_queue_waiting_tickets{job="qms"} > 60
+        for: 30m
+        labels: { severity: warning }
+        annotations:
+          summary: "More than 60 clients waiting at site {{ $labels.site }} for 30 minutes"
+          description: "Consider opening more counters or redistributing staff."
+
+      - alert: QmsWaitingWithNoAgents
+        expr: |
+          sum by (instance) (qms_queue_waiting_tickets{job="qms"}) > 0
+            and on (instance) sum by (instance) (qms_agent_sessions{job="qms", status="AVAILABLE"}) == 0
+        for: 20m
+        labels: { severity: warning }
+        annotations:
+          summary: "Clients are waiting at {{ $labels.instance }} but no agent is available"
+
+      - alert: QmsQueueTimeHigh
+        expr: |
+          histogram_quantile(0.9, sum by (instance, le) (rate(qms_ticket_queue_time_seconds_bucket{job="qms"}[1h]))) > 3600
+        for: 30m
+        labels: { severity: warning }
+        annotations:
+          summary: "90% of clients wait up to more than an hour before their first call at {{ $labels.instance }}"
+
+      - alert: QmsScheduledReportFailed
+        expr: increase(qms_report_runs_total{job="qms", status="FAILED"}[1h]) > 0
+        labels: { severity: warning }
+        annotations:
+          summary: "A scheduled report failed on {{ $labels.instance }}; see Scheduled Reports → Files"

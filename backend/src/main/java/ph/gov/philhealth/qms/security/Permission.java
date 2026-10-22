@@ -1,0 +1,9 @@
+package ph.gov.philhealth.qms.security;
+
+/** Fine-grained permissions. Roles map to permissions in table role_permission. */
+public enum Permission {
+    REGION_MANAGE, SITE_MANAGE, USER_VIEW, USER_MANAGE, CATALOG_MANAGE, SITE_SERVICE_MANAGE,
+    COUNTER_MANAGE, DEVICE_MANAGE, PRIORITY_MANAGE, QUEUE_VIEW, QUEUE_SERVE, QUEUE_SUPERVISE,
+    TICKET_VOID, CONTENT_EDIT, CONTENT_APPROVE, REPORT_VIEW, REPORT_EXPORT, AUDIT_VIEW,
+    SYSTEM_MONITOR, SYNC_MANAGE, SLA_MANAGE
+}

@@ -1,0 +1,105 @@
+# All secrets and environment-specific values come from environment variables.
+# See deploy/env/*.env.example for the full list. Never commit real values.
+spring:
+  application:
+    name: qms-backend
+  datasource:
+    url: ${QMS_DB_URL:jdbc:postgresql://localhost:5432/qms}
+    username: ${QMS_DB_USER:qms_app}
+    password: ${QMS_DB_PASSWORD:}
+    hikari:
+      maximum-pool-size: ${QMS_DB_POOL_SIZE:20}
+      minimum-idle: 2
+      connection-timeout: 10000
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate          # schema is owned by Flyway only
+    properties:
+      hibernate:
+        jdbc.time_zone: UTC
+        jdbc.batch_size: 50
+        order_inserts: true
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    # Production: set SPRING_FLYWAY_USER / SPRING_FLYWAY_PASSWORD to the schema owner so migrations
+    # run as the owner while the application uses the DML-only account above (V3). When unset,
+    # migrations use the application datasource (single-account development setups).
+    placeholders:
+      appRole: ${QMS_DB_USER:qms_app}
+  jackson:
+    default-property-inclusion: non_null
+    serialization:
+      write-dates-as-timestamps: false
+  servlet:
+    multipart:
+      max-file-size: 200MB
+      max-request-size: 210MB
+  threads:
+    virtual:
+      enabled: false
+
+server:
+  port: ${QMS_PORT:8080}
+  forward-headers-strategy: framework   # behind the TLS-terminating reverse proxy
+  error:
+    include-stacktrace: never
+    include-message: never
+
+management:
+  metrics:
+    tags:
+      application: qms
+      node: ${QMS_SITE_CODE:central}
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true    # enables p95 latency alerting (deploy/monitoring)
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never
+
+springdoc:
+  api-docs:
+    enabled: ${QMS_API_DOCS_ENABLED:true}
+  swagger-ui:
+    enabled: ${QMS_API_DOCS_ENABLED:true}
+
+qms:
+  node:
+    role: ${QMS_NODE_ROLE:SITE}            # SITE (local queue server) or CENTRAL
+    site-code: ${QMS_SITE_CODE:}           # required when role=SITE
+    default-timezone: ${QMS_TIMEZONE:Asia/Manila}
+  security:
+    jwt-secret: ${QMS_JWT_SECRET:}         # >= 256-bit random, base64; required
+    access-token-minutes: ${QMS_ACCESS_TOKEN_MINUTES:15}
+    refresh-token-hours: ${QMS_REFRESH_TOKEN_HOURS:12}
+    cors-allowed-origins: ${QMS_CORS_ORIGINS:}   # comma-separated exact origins
+    max-failed-logins: 5
+    lockout-minutes: 15
+    login-rate-per-minute: ${QMS_LOGIN_RATE_PER_MINUTE:20}
+    bootstrap-admin-password: ${QMS_BOOTSTRAP_ADMIN_PASSWORD:}
+    metrics-token: ${QMS_METRICS_TOKEN:}    # bearer token for Prometheus scraping of /actuator/prometheus
+  storage:
+    media-dir: ${QMS_MEDIA_DIR:./data/media}
+    reports-dir: ${QMS_REPORTS_DIR:./data/reports}          # generated scheduled reports
+    reports-retention-days: ${QMS_REPORTS_RETENTION_DAYS:180}
+  sync:
+    enabled: ${QMS_SYNC_ENABLED:false}
+    central-url: ${QMS_CENTRAL_URL:}
+    site-key: ${QMS_SYNC_SITE_KEY:}        # this site's key when pushing to central
+    push-interval-ms: ${QMS_SYNC_PUSH_INTERVAL_MS:15000}
+    config-pull-interval-ms: ${QMS_SYNC_CONFIG_PULL_INTERVAL_MS:300000}
+    reconcile-cron: ${QMS_SYNC_RECONCILE_CRON:0 30 * * * *}   # site: report daily counts to central
+    batch-size: 200
+    max-backoff-seconds: 900
+  cms:
+    super-admin-self-approval: ${QMS_CMS_SUPER_ADMIN_SELF_APPROVAL:true}   # false = strict two-person approval
+  queue:
+    expire-cron: ${QMS_EXPIRE_CRON:0 5 * * * *}   # hourly: expire open tickets of previous business days
