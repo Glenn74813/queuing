@@ -372,9 +372,143 @@ h1, h2, h3, .h1, .h2, .h3, .h4, .h5, .h6 {
 @media (min-width: 768px) {
   .qms-sidebar {
     width: 250px;
-    min-height: 100vh;
+    height: 100vh;
+    position: sticky;
+    top: 0;
     flex-shrink: 0;
+    overflow: hidden;
   }
+  /* Only the menu scrolls; the account panel stays at the foot. */
+  .sidebar-links {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+  }
+}
+.min-h-0 {
+  min-height: 0;
+}
+/* Account menu at the foot of the sidebar. */
+.sidebar-account {
+  flex-shrink: 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+}
+.account-avatar {
+  flex: 0 0 34px;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--qms-primary);
+  color: #fff;
+  font-size: 0.8rem;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.account-menu {
+  position: relative;
+}
+.account-trigger {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  background: none;
+  border: 0;
+  border-radius: 0.5rem;
+  padding: 0.4rem 0.5rem;
+  color: var(--qms-sidebar-fg);
+  text-align: left;
+}
+.account-trigger:hover,
+.account-trigger.is-open {
+  background: rgba(255, 255, 255, 0.08);
+}
+.account-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: #fff;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+.account-chevron {
+  flex: 0 0 auto;
+  color: #a9c7b5;
+  transition: transform 0.15s ease;
+}
+.account-chevron.is-open {
+  transform: rotate(180deg);
+}
+/* Menu opens upwards from the account button. */
+.account-popover {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(100% + 0.5rem);
+  z-index: 1050;
+  background: #fff;
+  color: var(--qms-ink);
+  border: 1px solid var(--qms-border);
+  border-radius: 0.6rem;
+  box-shadow: 0 10px 30px rgba(10, 30, 18, 0.25);
+  padding: 0.35rem;
+  animation: account-pop 0.12s ease-out;
+}
+@keyframes account-pop {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+.account-popover-head {
+  padding: 0.5rem 0.65rem 0.55rem;
+  border-bottom: 1px solid var(--qms-border);
+  margin-bottom: 0.3rem;
+}
+.account-popover-name {
+  font-weight: 600;
+  font-size: 0.875rem;
+}
+.account-popover-role {
+  color: var(--qms-muted);
+  font-size: 0.75rem;
+}
+.account-item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  background: none;
+  border: 0;
+  border-radius: 0.4rem;
+  padding: 0.5rem 0.65rem;
+  font-size: 0.875rem;
+  color: var(--qms-ink);
+  text-align: left;
+}
+.account-item svg {
+  color: var(--qms-muted);
+}
+.account-item:hover,
+.account-item:focus-visible {
+  background: #f1f5f2;
+}
+.account-item.is-danger,
+.account-item.is-danger svg {
+  color: #b42318;
+}
+.account-item.is-danger:hover,
+.account-item.is-danger:focus-visible {
+  background: #fdecea;
+}
+.account-sep {
+  height: 1px;
+  background: var(--qms-border);
+  margin: 0.3rem 0;
+}
+.min-w-0 {
+  min-width: 0;
 }
 
 /* ---------- Agent console ---------- */

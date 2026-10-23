@@ -6,7 +6,13 @@ export async function uiLogin(page: Page, username: string, password: string): P
   await page.getByLabel('Username').fill(username);
   await page.getByLabel('Password', { exact: true }).fill(password);
   await page.getByRole('button', { name: 'Sign in' }).click();
-  await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible();
+  await expect(page.getByRole('button', { name: /^Account menu/ })).toBeVisible();
+}
+
+/** Signs out through the account menu at the foot of the sidebar. */
+export async function uiSignOut(page: Page): Promise<void> {
+  await page.getByRole('button', { name: /^Account menu/ }).click();
+  await page.getByRole('menuitem', { name: 'Sign out' }).click();
 }
 
 /** Stores a kiosk/display API key before any page script runs (same as the device set-up screen). */

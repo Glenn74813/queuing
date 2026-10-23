@@ -3,16 +3,20 @@ import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { hasAnyPermission } from '../auth/permissions';
 import { NAV_GROUPS, NAV_ITEMS } from '../navigation';
+import { AccountMenu } from './AccountMenu';
 import { AgencyBrand } from './AgencyBrand';
 import { IdleSignOut } from './IdleSignOut';
 import { SiteSelector } from './SiteSelector';
 
-/** Staff application shell: permission-filtered sidebar, top bar with site selector and account menu. */
+/** Staff application shell: permission-filtered sidebar with the account menu at its foot, top bar with site selector. */
 export function Layout() {
   const { me, logout } = useAuth();
   const navigate = useNavigate();
   const [navOpen, setNavOpen] = useState(false);
   const visible = NAV_ITEMS.filter((i) => hasAnyPermission(me?.permissions, i.anyOf));
+  // Highest role, with its scope: "Super Administrator", "Servicing Agent · LHIO Quezon City".
+  const top = me?.assignments[0];
+  const role = top ? `${top.roleName}${top.siteName ? ` · ${top.siteName}` : top.regionName ? ` · ${top.regionName}` : ''}` : '';
 
   const onLogout = async () => {
     await logout();
@@ -24,7 +28,7 @@ export function Layout() {
       <a href="#main" className="visually-hidden-focusable position-absolute top-0 start-0 p-2 bg-white z-3">
         Skip to main content
       </a>
-      <nav className="qms-sidebar p-2" aria-label="Main navigation">
+      <nav className="qms-sidebar p-2 d-flex flex-column" aria-label="Main navigation">
         <div className="d-flex justify-content-between align-items-center p-2">
           <Link to="/" className="p-0 text-white">
             <AgencyBrand />
@@ -39,7 +43,8 @@ export function Layout() {
             Menu
           </button>
         </div>
-        <div id="qms-nav-links" className={`${navOpen ? 'd-block' : 'd-none'} d-md-block`}>
+        <div id="qms-nav-links" className={`${navOpen ? 'd-flex' : 'd-none'} d-md-flex flex-column flex-grow-1 min-h-0`}>
+          <div className="sidebar-links">
           {NAV_GROUPS.map((group) => {
             const items = visible.filter((i) => i.group === group);
             if (items.length === 0) return null;
@@ -58,22 +63,15 @@ export function Layout() {
               </div>
             );
           })}
+          </div>
+          <section className="sidebar-account" aria-label="Your account">
+            <AccountMenu name={me?.fullName} role={role} onSignOut={onLogout} onNavigate={() => setNavOpen(false)} />
+          </section>
         </div>
       </nav>
       <div className="flex-grow-1 d-flex flex-column min-vw-0" style={{ minWidth: 0 }}>
         <header className="qms-topbar d-flex flex-wrap align-items-center justify-content-between gap-2 px-3 px-lg-4 py-2 border-bottom">
           <SiteSelector />
-          <div className="d-flex align-items-center gap-2">
-            <span className="small">
-              Signed in as <strong>{me?.fullName}</strong>
-            </span>
-            <Link to="/change-password" className="btn btn-sm btn-outline-secondary">
-              Change password
-            </Link>
-            <button type="button" className="btn btn-sm btn-outline-danger" onClick={onLogout}>
-              Sign out
-            </button>
-          </div>
         </header>
         <main id="main" className="qms-main p-3 p-lg-4 flex-grow-1" tabIndex={-1}>
           <Outlet />

@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { Api } from '../support/api';
 import { loadState } from '../support/state';
-import { uiLogin } from '../support/ui';
+import { uiLogin, uiSignOut } from '../support/ui';
 
 /**
  * Sign-in, forced first-login password change, session restore on reload and sign-out.
@@ -40,7 +40,7 @@ test.describe('authentication', () => {
     const alert = page.getByRole('alert');
     await expect(alert).toContainText('Invalid username or password');
     await expect(page).toHaveURL(/\/login$/);
-    await expect(page.getByRole('button', { name: 'Sign out' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /^Account menu/ })).toHaveCount(0);
   });
 
   test('first login forces a password change; the session survives reload; sign out works', async ({ page }) => {
@@ -63,19 +63,20 @@ test.describe('authentication', () => {
     await page.getByRole('button', { name: 'Change password' }).click();
 
     // Lands in the application (first page the agent may see).
-    await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible();
-    await expect(page.getByText(`Signed in as ${user.fullName}`)).toBeVisible();
+    await expect(page.getByRole('button', { name: /^Account menu/ })).toBeVisible();
+    await expect(page.getByRole('region', { name: 'Your account' })).toContainText(user.fullName);
     await expect(page).not.toHaveURL(/\/(login|change-password)$/);
     const landedOn = new URL(page.url()).pathname;
 
     // Regression: changing the password revoked the refresh token, so a reload used to sign the user out.
     await page.reload();
-    await expect(page.getByText(`Signed in as ${user.fullName}`)).toBeVisible();
+    await expect(page.getByRole('region', { name: 'Your account' })).toContainText(user.fullName);
     await expect(page).toHaveURL(new RegExp(`${landedOn}$`));
     await expect(page.getByRole('button', { name: 'Sign in' })).toHaveCount(0);
 
     // Sign out
-    await page.getByRole('button', { name: 'Sign out' }).click();
+    // The account menu shows the name; Sign out is inside it.
+    await uiSignOut(page);
     await expect(page).toHaveURL(/\/login$/);
     await expect(page.getByRole('button', { name: 'Sign in' })).toBeVisible();
     // ...and stays signed out after a reload.
