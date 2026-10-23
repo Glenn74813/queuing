@@ -32,6 +32,8 @@ public class QmsMetrics {
     private final AtomicLong outboxPending = new AtomicLong();
     private final AtomicLong outboxFailed = new AtomicLong();
     private final AtomicLong outboxOldestPendingSeconds = new AtomicLong();
+    /** 1 when the application's database role can change or delete audit/ticket history (should be 0). */
+    private final AtomicLong historyWritable = new AtomicLong();
     private final DistributionSummary queueTime;
 
     public QmsMetrics(MeterRegistry registry, JdbcTemplate jdbc) {
@@ -45,6 +47,9 @@ public class QmsMetrics {
         Gauge.builder("qms.sync.outbox.entries", outboxPending, AtomicLong::get).tag("status", "pending")
                 .description("Outbox entries not yet delivered to central").register(registry);
         Gauge.builder("qms.sync.outbox.entries", outboxFailed, AtomicLong::get).tag("status", "failed")
+                .register(registry);
+        Gauge.builder("qms.db.history.writable", historyWritable, AtomicLong::get)
+                .description("1 if the application role can update or delete audit_log/ticket_event (least privilege broken)")
                 .register(registry);
         Gauge.builder("qms.sync.outbox.oldest.pending.age", outboxOldestPendingSeconds, AtomicLong::get)
                 .baseUnit("seconds").description("Age of the oldest undelivered outbox entry").register(registry);
@@ -94,6 +99,28 @@ public class QmsMetrics {
                 .tag("result", result).register(registry).increment(entries);
     }
 
+    /**
+     * The audit trail is append-only only when the application connects as a role other than the
+     * table owner (V3). A single-account development setup is not checked. A restore that re-grants
+     * full DML (see deploy/scripts/restore.sh) is caught here.
+     */
+    void refreshHistoryPrivileges() {
+        Boolean writable = jdbc.queryForObject("""
+                select current_user <> t.tableowner and (
+                    has_table_privilege(current_user, 'audit_log', 'UPDATE')
+                    or has_table_privilege(current_user, 'audit_log', 'DELETE')
+                    or has_table_privilege(current_user, 'ticket_event', 'UPDATE')
+                    or has_table_privilege(current_user, 'ticket_event', 'DELETE'))
+                from pg_tables t where t.schemaname = current_schema() and t.tablename = 'audit_log'
+                """, Boolean.class);
+        long now = Boolean.TRUE.equals(writable) ? 1 : 0;
+        if (now == 1 && historyWritable.get() == 0) {
+            log.error("The application database role can UPDATE/DELETE audit_log or ticket_event. Re-apply the "
+                    + "least-privilege grants (deploy/scripts/restore.sh does this after a restore; see operations.md).");
+        }
+        historyWritable.set(now);
+    }
+
     @Scheduled(fixedDelay = 30_000, initialDelay = 15_000)
     public void refreshGauges() {
         try {
@@ -117,6 +144,7 @@ public class QmsMetrics {
                 outboxFailed.set(rs.getLong(2));
                 outboxOldestPendingSeconds.set((long) rs.getDouble(3));
             });
+            refreshHistoryPrivileges();
         } catch (RuntimeException e) {
             log.warn("Metric refresh failed: {}", e.getMessage());
         }

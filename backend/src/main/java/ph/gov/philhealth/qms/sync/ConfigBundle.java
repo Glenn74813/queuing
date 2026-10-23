@@ -8,7 +8,20 @@ import java.util.UUID;
 /** Central-owned configuration distributed to site nodes (central → site direction). */
 public record ConfigBundle(Instant serverTime, List<RegionRow> regions, List<SiteRow> sites,
                            List<ServiceItemRow> serviceItems, List<PriorityRow> priorityCategories,
-                           List<ContentRow> contents) {
+                           List<ContentRow> contents, List<NumberFloor> numberFloors) {
+
+    public ConfigBundle(Instant serverTime, List<RegionRow> regions, List<SiteRow> sites,
+                        List<ServiceItemRow> serviceItems, List<PriorityRow> priorityCategories,
+                        List<ContentRow> contents) {
+        this(serverTime, regions, sites, serviceItems, priorityCategories, contents, List.of());
+    }
+
+    /**
+     * Highest ticket number central holds for the site, per prefix, in the current numbering period.
+     * A site restored from an older backup never issues at or below it (null from pre-V12 central).
+     */
+    public record NumberFloor(UUID siteId, String prefix, LocalDate periodStart, int lastValue) {
+    }
 
     /** Published (or since archived) national/regional/site content created on central for this site. */
     public record ContentRow(UUID id, String title, String type, String body, String mediaPath, String mimeType,

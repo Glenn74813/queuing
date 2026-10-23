@@ -33,6 +33,14 @@ Closed on 2026-10-22, all with automated tests:
 | E1, E2 | RTM rows for tests, numbering, e-ticket, sessions, monitoring and retention updated; the WebSocket single-node limit is noted under R-11.1. |
 | (extra) | Site Services › **Add all catalog services**. |
 
+Verified on 2026-10-22 with a Docker Compose two-node drill (details in test-plan.md):
+
+| Item | Result |
+|---|---|
+| B4 | Compose stacks built from the production Dockerfiles ran as a central and a site node behind TLS. The native installer is still not run. |
+| B2 | WAN cut while 18 clients were served; central caught up with no loss, and reconciliation showed MATCH. Minutes-long outage only; an hours-long run is still open. |
+| B3 | Backup and restore drilled twice (stop to healthy in 13–30 s). Found and fixed: backups failing under Compose, a TTY-corrupted media archive, restore not covering media, the audit trail losing its append-only grants after restore, a restored site reissuing ticket numbers that central then rejected, and slow catch-up after long outages. A DR restore onto another host is still open. |
+
 ## A. Functional gaps that development can close
 
 | # | Spec ref | Gap | Evidence | Size |

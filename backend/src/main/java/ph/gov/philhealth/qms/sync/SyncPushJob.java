@@ -74,7 +74,8 @@ public class SyncPushJob {
         } catch (RuntimeException e) {
             log.warn("Sync push of {} entries failed: {}", due.size(), e.getMessage());
             metrics.syncPush("transport_error", due.size());
-            tx.executeWithoutResult(s -> due.forEach(entry -> markFailed(entry.getId(), "Transport: " + e.getMessage())));
+            tx.executeWithoutResult(s -> due.forEach(entry -> markFailed(entry.getId(), "Transport: " + e.getMessage(),
+                    TRANSPORT_MAX_BACKOFF_SECONDS)));
         }
     }
 
@@ -93,7 +94,7 @@ public class SyncPushJob {
                     e.setLastError(null);
                 });
             } else {
-                markFailed(entry.getId(), rejected.getOrDefault(key, "No acknowledgement"));
+                markFailed(entry.getId(), rejected.getOrDefault(key, "No acknowledgement"), props.sync().maxBackoffSeconds());
             }
         }));
         if (!ok.isEmpty()) {
@@ -103,13 +104,19 @@ public class SyncPushJob {
         metrics.syncPush("rejected", byKey.size() - (int) byKey.keySet().stream().filter(ok::contains).count());
     }
 
-    private void markFailed(java.util.UUID id, String error) {
+    /**
+     * Central unreachable (WAN or central outage): retrying costs nothing, and a short cap means the
+     * backlog starts draining within a minute of the link returning instead of after the long backoff
+     * that rejected entries get (measured in the two-node drill: 49 s after a 75 s outage before).
+     */
+    static final int TRANSPORT_MAX_BACKOFF_SECONDS = 60;
+
+    private void markFailed(java.util.UUID id, String error, int maxBackoffSeconds) {
         outbox.findById(id).ifPresent(e -> {
             e.setAttempts(e.getAttempts() + 1);
             e.setStatus(OutboxEntry.Status.FAILED);
             e.setLastError(error.length() > 1000 ? error.substring(0, 1000) : error);
-            e.setNextAttemptAt(Instant.now().plusSeconds(backoffSeconds(e.getAttempts(),
-                    props.sync().maxBackoffSeconds())));
+            e.setNextAttemptAt(Instant.now().plusSeconds(backoffSeconds(e.getAttempts(), maxBackoffSeconds)));
         });
     }
 

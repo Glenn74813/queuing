@@ -28,6 +28,7 @@ spring:
     # migrations use the application datasource (single-account development setups).
     placeholders:
       appRole: ${QMS_DB_USER:qms_app}
+      nodeRole: ${qms.node.role}
   jackson:
     default-property-inclusion: non_null
     serialization:

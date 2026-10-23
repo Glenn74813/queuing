@@ -22,8 +22,8 @@ Section numbers refer to the project development prompt or specification.
 | R-2.1 | Java 17, Spring Boot 3.x, Web, Security, JWT, JPA, Validation, WebSocket, Scheduling, Flyway, Maven, OpenAPI | `backend/pom.xml` (Boot 3.5.16, **Java 21**) | Build passes | Built+Tested; **deviation**: Java 21 instead of the specified 17 | Pending (OI-20, OI-25) |
 | R-2.2 | React + TypeScript + Vite, Router, Axios, Bootstrap, WebSocket client | `frontend/package.json` | `npm run build` | Built+Tested | Pending |
 | R-2.3 | PostgreSQL 17, normalized schema, FKs, indexes, constraints, migrations | `V1__core_schema.sql`, `V2__reference_data.sql` | Integration tests run against PostgreSQL 17 | Built+Tested | Pending |
-| R-2.4 | Docker / Compose, env-specific configuration; installation on approved hosts | `deploy/docker-compose.yml`, `deploy/env/*.example`; non-Docker installer `deploy/native` (systemd, nginx, PostgreSQL) | Compose not executed (no Docker on build machine); native installer dry-run and static checks only | Built | Pending (OI-02) |
-| R-2.5 | Automated build, test, deploy, backup, recovery | Maven/npm builds; CI workflow; `install-site.sh`, `backup.sh`, `restore.sh` | CI not yet activated; scripts not executed | Partial | Pending |
+| R-2.4 | Docker / Compose, env-specific configuration; installation on approved hosts | `deploy/docker-compose.yml`, `deploy/env/*.example`; non-Docker installer `deploy/native` (systemd, nginx, PostgreSQL) | Compose run from the production Dockerfiles as a central and a site node with TLS (test-plan, 2026-10-22 drill); native installer dry-run and static checks only | Built+Tested (Compose); native not yet run | Pending (OI-02) |
+| R-2.5 | Automated build, test, deploy, backup, recovery | Maven/npm builds; CI workflow; `install-site.sh`, `backup.sh`, `restore.sh` (database and media; re-applies least privilege) | Backup and restore drilled twice on a Compose site node (4 defects found and fixed, see test-plan); CI not yet activated | Partial: CI not active; no DR drill on target infrastructure | Pending |
 | R-3.1 | Local site operation independent of the central node | Per-site node; outbox and pull jobs isolated from request handling | Design only; no outage drill done | Built | Pending |
 | R-3.2 | Central management and synchronization | `sync` package | `SyncIngestIT` | Partial (see sync-design limitations) | Pending |
 | R-3.3 | Integration layer for PhilHealth systems | – | – | Blocked (OI-10, OI-11) | – |
@@ -98,12 +98,12 @@ Section numbers refer to the project development prompt or specification.
 |---|---|---|---|---|---|
 | R-9.1 | Integration with CSMST and other systems | Feedback stored locally | – | Blocked (OI-10, OI-11) | – |
 | R-9.2 | Documented, versioned REST APIs | `/api/v1`, OpenAPI at `/v3/api-docs`, `api-contract.md` | – | Built | Pending |
-| R-10.1 | Local operation during outages (tickets, counters, calls, events, display, storage) | Site node architecture | Not drilled | Built | Pending |
-| R-10.2 | Durable outbound queue, retry with backoff, idempotency keys, duplicate detection | `sync_outbox`, `SyncPushJob`, `sync_inbox` | `SyncIngestIT`, `BackoffTest` | Built+Tested (ingest side) | Pending |
+| R-10.1 | Local operation during outages (tickets, counters, calls, events, display, storage) | Site node architecture | Two-node drill: WAN cut while 18 clients were ticketed and served; outbox drained after reconnection with reconciliation MATCH (test-plan, 2026-10-22) | Built+Tested (minutes-long outage) | Pending |
+| R-10.2 | Durable outbound queue, retry with backoff, idempotency keys, duplicate detection | `sync_outbox`, `SyncPushJob` (transport errors retried at least every 60 s), `sync_inbox` | `SyncIngestIT`, `BackoffTest`, two-node drill | Built+Tested | Pending |
 | R-10.3 | Conflict resolution, data ownership per category | `sync-design.md`, version check, `OwnershipGuard` | `SyncIngestIT` (stale version) | Built+Tested | Pending |
 | R-10.4 | Checkpoints, monitoring, admin reconciliation | `sync_state` watermark, `/system/status`, `/sync/outbox`, retry; hourly site daily summaries compared on central (`/sync/reconciliation`, System page) | `SyncIngestIT.reconciliationComparesSiteCountsWithCentral`, `ReconciliationStatusTest` | Built+Tested | Pending |
 | R-10.5 | Integrity verification | SHA-256 per entry | `SyncIngestIT` (tampered entry) | Built+Tested | Pending |
-| R-10.6 | Inbound configuration sync | `ConfigSyncService` | – | Built (not tested end to end) | Pending |
+| R-10.6 | Inbound configuration sync | `ConfigSyncService`; also carries the highest ticket numbers central holds so a restored site does not reissue them | `ContentDistributionIT`, `NumberFloorIT`, `SyncIngestIT`; two-node drill over TLS | Built+Tested | Pending |
 
 ## 11–12 Performance and security
 
@@ -125,7 +125,7 @@ Section numbers refer to the project development prompt or specification.
 | R-14.1 | Source, migrations, API docs, env templates, build instructions | Repository | – | Built | Pending |
 | R-14.2 | User and administrator manuals, troubleshooting guide | `user-guide.md` (agents, supervisors, administrators, reporting), `operations.md`, `deploy/native/README.md` | Written from the implemented screens; not reviewed by PhilHealth users | Built | Pending |
 | R-14.3 | Architecture and DB diagrams | `architecture.md`, `sync-design.md`, `database.md` (ER diagram, data dictionary) | Diagram cross-checked against the migration SQL; Mermaid not rendered locally | Built | Pending |
-| R-15 | Automated unit/integration/API/frontend tests | 60 backend, 65 frontend, 15 browser end-to-end (Playwright); manual browser smoke test (see test-plan) | Passing | Partial: no load tests, cross-browser runs or third-party security scans (see `test-plan.md`) | – |
+| R-15 | Automated unit/integration/API/frontend tests | 63 backend, 65 frontend, 15 browser end-to-end (Playwright); manual browser smoke test (see test-plan) | Passing | Partial: no load tests, cross-browser runs or third-party security scans (see `test-plan.md`) | – |
 | R-16 | Two-year warranty, 120 man-hours, 24/7 on-call, SLA | – | – | Process (OI-21) | – |
 | R-17 | Training and knowledge transfer | – | – | Process | – |
 | R-18 | Layered code, transactions, server-side validation, central error handling, migrations, health checks | Throughout | Code review | Built | Pending |

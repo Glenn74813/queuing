@@ -32,6 +32,8 @@ class SyncIngestIT {
     JdbcTemplate jdbc;
     @Autowired
     ReconciliationService reconciliation;
+    @Autowired
+    ConfigSyncService config;
 
     private SyncEnvelope.Entry summaryEntry(String siteCode, ReconciliationService.DailySummary s) throws Exception {
         String payload = mapper.writeValueAsString(s);
@@ -116,5 +118,25 @@ class SyncIngestIT {
                 .containsExactlyInAnyOrder(tampered.idempotencyKey(), foreign.idempotencyKey());
         assertThat(jdbc.queryForObject("select count(*) from sync_inbox where idempotency_key in (?, ?)",
                 Integer.class, tampered.idempotencyKey(), foreign.idempotencyKey())).isZero();
+    }
+
+    @Test
+    void restoredSiteMayRepeatANumberAndLearnsCentralsHighestNumber() throws Exception {
+        TestData.SiteFixture site = data.site();
+        SitePrincipal principal = new SitePrincipal(site.siteId(), site.siteCode());
+        // Before and after the site was restored from backup: two clients, both given A-001.
+        var before = entry(site.siteCode(), change(site, Ids.newId(), "COMPLETED", 0), false);
+        var after = entry(site.siteCode(), change(site, Ids.newId(), "WAITING", 0), false);
+        assertThat(ingest.ingest(principal, List.of(before)).accepted()).hasSize(1);
+        assertThat(ingest.ingest(principal, List.of(after)).accepted()).hasSize(1);
+        assertThat(jdbc.queryForObject("select count(*) from ticket where site_id = ? and display_number = 'A-001'",
+                Integer.class, site.siteId())).isEqualTo(2);
+
+        // The next config pull tells the site the highest number central holds per prefix.
+        assertThat(config.numberFloors(site.siteId())).singleElement()
+                .satisfies(f -> {
+                    assertThat(f.prefix()).isEqualTo("A");
+                    assertThat(f.lastValue()).isEqualTo(1);
+                });
     }
 }

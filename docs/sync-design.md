@@ -143,6 +143,22 @@ page) compares it with the rows central holds:
 
 A site administrator can queue summaries immediately with **Send summaries now** on the System page.
 
+## Restoring a site node from backup
+
+A restored site no longer has the records it created after the backup, but central does. Two rules
+keep both sides consistent:
+
+* **Numbering floor.** Every configuration bundle carries, per prefix, the highest ticket number
+  central holds for the site in the current numbering period (`numberFloors`). The site raises its
+  sequence to at least that value (never lowers it), so once it has pulled configuration it does
+  not reissue a number central already knows.
+* **Central keys tickets by id only.** On central, V12 removes the per-day uniqueness of ticket
+  numbers. If a restored site issues a number again before its first pull (for example with the
+  WAN down), central keeps both clients' records instead of rejecting the newer one.
+
+Reconciliation then shows central holding more records for that day than the site. This is
+expected: those are the clients served between the backup and the restore.
+
 ## Known limitations (v0.1)
 
 * Reconciliation compares **counts**, not individual record ids. It detects that records are

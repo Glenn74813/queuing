@@ -51,6 +51,25 @@ gpg --batch --decrypt "$FILE" \
   | runuser -u postgres -- "$PG_BIN/pg_restore" -d qms --clean --if-exists --no-owner --role="$OWNER"
 echo "Database restored."
 
+# pg_restore recreates each table, which applies the owner's default grants (full DML for the
+# application role); the dump only re-grants. Re-apply least privilege (V3, V11) so the audit trail
+# stays append-only (found in the 2026-10-22 restore drill, docs/test-plan.md).
+APP="$(grep -E '^QMS_DB_USER=' "$ENV_FILE" | tail -n 1 | cut -d= -f2- | tr -d '[:space:]')"
+APP="${APP:-qms_app}"
+runuser -u postgres -- "$PG_BIN/psql" -v ON_ERROR_STOP=1 -q -d qms <<SQL
+DO \$\$
+BEGIN
+    EXECUTE format('REVOKE UPDATE, DELETE, TRUNCATE ON audit_log, ticket_event FROM %I', '$APP');
+    EXECUTE format('REVOKE ALL ON flyway_schema_history FROM %I', '$APP');
+    IF to_regprocedure('qms_purge_audit(timestamptz, int)') IS NOT NULL THEN
+        REVOKE ALL ON FUNCTION qms_purge_tickets(date, int), qms_purge_audit(timestamptz, int) FROM PUBLIC;
+        EXECUTE format('GRANT EXECUTE ON FUNCTION qms_purge_tickets(date, int), qms_purge_audit(timestamptz, int) TO %I', '$APP');
+    END IF;
+END
+\$\$;
+SQL
+echo "Least-privilege grants re-applied."
+
 if [ -n "$MEDIA" ]; then
   rm -rf "$DATA_DIR/media.restore"
   mkdir -p "$DATA_DIR/media.restore"

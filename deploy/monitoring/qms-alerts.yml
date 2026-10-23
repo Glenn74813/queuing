@@ -55,6 +55,13 @@ groups:
 
   - name: qms-synchronization
     rules:
+      - alert: QmsAuditTrailWritable
+        expr: qms_db_history_writable{job="qms"} == 1
+        for: 5m
+        labels: { severity: critical }
+        annotations:
+          summary: "Audit trail on {{ $labels.instance }} is no longer append-only"
+          description: "The application database role can update or delete audit_log/ticket_event, usually after a manual database restore. Re-apply the least-privilege grants (operations.md, Restore)."
       - alert: QmsSyncFailures
         expr: qms_sync_outbox_entries{job="qms", status="failed"} > 0
         for: 30m

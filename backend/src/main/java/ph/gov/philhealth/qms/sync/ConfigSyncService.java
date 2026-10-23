@@ -3,6 +3,7 @@ package ph.gov.philhealth.qms.sync;
 import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 import org.slf4j.Logger;
@@ -19,6 +20,7 @@ import ph.gov.philhealth.qms.common.ApiException;
 import ph.gov.philhealth.qms.config.QmsProperties;
 import ph.gov.philhealth.qms.security.SiteKeyAuthenticationFilter;
 import ph.gov.philhealth.qms.security.SitePrincipal;
+import ph.gov.philhealth.qms.queue.TicketNumberAllocator;
 
 /**
  * Builds configuration bundles on the central node and applies them on site nodes. Pulls are
@@ -97,7 +99,7 @@ public class ConfigSyncService {
                 jdbc.query("select id, code, name, description, rank, active from priority_category where updated_at >= ?",
                         (rs, i) -> new ConfigBundle.PriorityRow(rs.getObject(1, java.util.UUID.class), rs.getString(2),
                                 rs.getString(3), rs.getString(4), rs.getInt(5), rs.getBoolean(6)), from),
-                contentFor(site.siteId(), regionId, from));
+                contentFor(site.siteId(), regionId, from), numberFloors(site.siteId()));
     }
 
     private List<ConfigBundle.ContentRow> contentFor(UUID siteId, UUID regionId, Timestamp from) {
@@ -119,6 +121,19 @@ public class ConfigSyncService {
                         rs.getInt(13), rs.getString(14), rs.getString(15), rs.getString(16),
                         instant(rs.getTimestamp(17))),
                 siteId, regionId, from);
+    }
+
+    /** Per prefix, the highest number central holds for the site in its current numbering period. */
+    List<ConfigBundle.NumberFloor> numberFloors(UUID siteId) {
+        var site = jdbc.queryForMap("select timezone, ticket_number_reset from site where id = ?", siteId);
+        LocalDate today = LocalDate.now(java.time.ZoneId.of((String) site.get("timezone")));
+        LocalDate start = TicketNumberAllocator.periodStart(today,
+                TicketNumberAllocator.Reset.valueOf((String) site.get("ticket_number_reset")));
+        return jdbc.query("""
+                        select prefix, max(seq_no) from ticket
+                        where site_id = ? and business_date between ? and ? group by prefix
+                        """, (rs, i) -> new ConfigBundle.NumberFloor(siteId, rs.getString(1), start, rs.getInt(2)),
+                siteId, start, today);
     }
 
     /** Stored media name of published content distributable to the site, for the media download endpoint. */
@@ -265,6 +280,14 @@ public class ConfigSyncService {
                         description = excluded.description, rank = excluded.rank, active = excluded.active,
                         updated_at = now()
                     """, p.id(), p.code(), p.name(), p.description(), p.rank(), p.active());
+        }
+        // Numbers central already holds (e.g. issued after the backup this node was restored from).
+        for (var f : b.numberFloors() == null ? List.<ConfigBundle.NumberFloor>of() : b.numberFloors()) {
+            jdbc.update("""
+                    insert into ticket_sequence (site_id, prefix, business_date, last_value) values (?,?,?,?)
+                    on conflict (site_id, prefix, business_date)
+                    do update set last_value = greatest(ticket_sequence.last_value, excluded.last_value)
+                    """, f.siteId(), f.prefix(), f.periodStart(), f.lastValue());
         }
     }
 }

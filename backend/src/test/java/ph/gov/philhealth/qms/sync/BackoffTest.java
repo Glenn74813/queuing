@@ -13,4 +13,9 @@ class BackoffTest {
         assertThat(SyncPushJob.backoffSeconds(5, 900)).isEqualTo(80);
         assertThat(SyncPushJob.backoffSeconds(30, 900)).isEqualTo(900);
     }
+
+    @Test
+    void unreachableCentralIsRetriedAtLeastEveryMinute() {
+        assertThat(SyncPushJob.backoffSeconds(30, SyncPushJob.TRANSPORT_MAX_BACKOFF_SECONDS)).isEqualTo(60);
+    }
 }
