@@ -8,6 +8,7 @@ import { TextField } from '../../components/FormFields';
 import { PageHeader } from '../../components/PageHeader';
 import { useAsync } from '../../hooks/useAsync';
 import { formatDateTime, todayIso } from '../../utils/format';
+import { entityLabel, humanizeCode, toCode } from '../../utils/labels';
 
 const PAGE_SIZE = 50;
 
@@ -18,7 +19,7 @@ export function AuditPage() {
 
   const apply = (e: FormEvent) => {
     e.preventDefault();
-    setParams({ ...form, page: 0, size: PAGE_SIZE });
+    setParams({ ...form, action: form.action ? toCode(form.action) : '', page: 0, size: PAGE_SIZE });
   };
   const set = (k: keyof typeof form) => (v: string) => setForm((p) => ({ ...p, [k]: v }));
 
@@ -31,7 +32,7 @@ export function AuditPage() {
         <TextField className="col-sm-6 col-md-2" label="From" type="date" value={form.from} onChange={set('from')} />
         <TextField className="col-sm-6 col-md-2" label="To" type="date" value={form.to} onChange={set('to')} />
         <TextField className="col-sm-6 col-md-3" label="Actor (username)" value={form.actor} onChange={set('actor')} />
-        <TextField className="col-sm-6 col-md-3" label="Action" value={form.action} onChange={set('action')} placeholder="e.g. TICKET_VOID" />
+        <TextField className="col-sm-6 col-md-3" label="Action" value={form.action} onChange={set('action')} placeholder="e.g. Ticket voided" />
         <div className="col-md-2">
           <button type="submit" className="btn btn-primary w-100">Apply</button>
         </div>
@@ -43,8 +44,18 @@ export function AuditPage() {
         columns={[
           { key: 'at', header: 'When', render: (a) => formatDateTime(a.at) },
           { key: 'actorUsername', header: 'Actor', render: (a) => a.actorUsername ?? 'system' },
-          { key: 'action', header: 'Action', render: (a) => <code>{a.action}</code> },
-          { key: 'entity', header: 'Entity', render: (a) => (a.entityType ? `${a.entityType} ${a.entityId ?? ''}` : '—') },
+          { key: 'action', header: 'Action', className: 'text-nowrap',
+            render: (a) => <span className="fw-medium" title={a.action}>{humanizeCode(a.action)}</span> },
+          { key: 'entity', header: 'Entity', className: 'text-nowrap', render: (a) => (a.entityType ? (
+            <>
+              {entityLabel(a.entityType)}
+              {a.entityId && (
+                <div className="small text-body-secondary font-monospace" title={a.entityId}>
+                  {a.entityId.length > 12 ? `${a.entityId.slice(0, 8)}…` : a.entityId}
+                </div>
+              )}
+            </>
+          ) : '—') },
           { key: 'details', header: 'Details', render: (a) => <span className="small text-break">{a.details ?? '—'}</span> },
           { key: 'ipAddress', header: 'IP', render: (a) => a.ipAddress ?? '—' },
         ]} />
