@@ -22,11 +22,11 @@ requirement-to-test mapping stays in [requirements-traceability-matrix.md](requi
 |---|---|---|
 | Met (tested) | 89 | 58% |
 | Met (untested) | 7 | 5% |
-| Partial | 32 | 21% |
-| Not met | 11 | 7% |
+| Partial | 34 | 22% |
+| Not met | 10 | 6% |
 | Blocked | 7 | 5% |
 | Process | 7 | 5% |
-| **Total** | **153** | |
+| **Total** | **154** | |
 
 Rows group closely related TOR bullets (for example the full agent action list is one row), so the shares
 are indicative; the per-section tables below are the authoritative view.
@@ -54,7 +54,7 @@ Section by section:
 | 8.3 Reporting features | 6 |  | 1 |  | 1 |  |
 | 9 Integration with PhilHealth systems | 1 |  | 2 |  | 1 |  |
 | 10 Offline operation and synchronization | 6 | 1 | 1 |  |  |  |
-| 11 Scalability and performance | 3 |  | 1 | 3 |  |  |
+| 11 Scalability and performance | 3 |  | 3 | 2 |  |  |
 | 12 Security | 9 | 1 | 1 | 1 |  | 1 |
 | 13 Administration | 3 |  | 1 | 2 |  |  |
 | 14 Source code and documentation | 3 | 1 | 3 |  |  |  |
@@ -108,7 +108,7 @@ CSMST integration, official report and display templates, VAPT, UAT, and the con
 | Local site deployment keeps working during WAN/central outages | Met (tested) | WAN cut while 18 clients were served (drill). |
 | Central configuration distribution and data synchronization | Met (tested) | Config pull and outbox push over TLS; reconciliation MATCH (drill). |
 | Integration layer with configurable adapters for PhilHealth systems | Not met | No adapter framework; CSMST interface unknown (OI-10, OI-11). |
-| Architecture validated against PhilHealth infrastructure and Annex B | Blocked | Infrastructure and Annex B performance figures not provided (OI-01, OI-02). |
+| Architecture validated against PhilHealth infrastructure and Annex B | Blocked | Load derived (capacity-plan.md); infrastructure and Annex B figures not provided (OI-02). |
 
 ## 4 User roles and access control
 
@@ -288,8 +288,9 @@ CSMST integration, official report and display templates, VAPT, UAT, and the con
 | Caching; load balancing | Not met | No caching layer; no load-balanced configuration. |
 | Backup and recovery | Met (tested) | Encrypted backup and restore drilled twice. |
 | Monitoring of CPU, memory, storage, latency, database | Met (tested) | Prometheus metrics, 13 alert rules, Grafana dashboard (rules run in Prometheus). |
-| Capacity planning and performance/load testing | Not met | Not done; "17 million users" not clarified (OI-01). |
-| Measurable SLOs (response time, throughput, sync delay, availability, recovery) | Not met | Not defined yet. |
+| Capacity planning | Partial | capacity-plan.md: 17 million = client visits per year (confirmed 2026-10-23), about 68,500 a day, 7 tickets/s national peak, storage growth; peak factors to confirm with historical data (OI-01). |
+| Performance and load testing | Not met | Plan written in capacity-plan.md; not run (needs target hardware, OI-02). |
+| Measurable SLOs (response time, throughput, sync delay, availability, recovery) | Partial | Proposed in capacity-plan.md; not yet agreed with PhilHealth. |
 
 ## 12 Security
 
@@ -341,7 +342,7 @@ CSMST integration, official report and display templates, VAPT, UAT, and the con
 | Offline/synchronization; data validation and report reconciliation | Met (tested) | Drill; `QueueFlowIT` reconciliation. |
 | Backup restoration and disaster recovery | Partial | Restore drilled; no DR to a separate host or timed RPO. |
 | Printer and kiosk compatibility | Blocked | Needs procured devices (OI-15). |
-| Load and stress testing | Not met | Not done (OI-01, OI-02). |
+| Load and stress testing | Not met | Plan in capacity-plan.md; not run (OI-02). |
 | Cross-browser and responsive testing | Not met | Chrome only. |
 | Third-party VAPT | Process | OI-22. |
 | UAT at representative sites; signed acceptance | Process | Not scheduled. |
@@ -370,7 +371,7 @@ CSMST integration, official report and display templates, VAPT, UAT, and the con
 | Priority | Item | Owner |
 |---|---|---|
 | 1 | Push the repository and get CI running (check GitHub billing/Actions settings); add the NVD API key secret | You |
-| 2 | Define SLOs and run a load test against agreed volumes (clarify the 17 million users, OI-01) | Development + PhilHealth |
+| 2 | Agree the proposed SLOs and run the load test in capacity-plan.md (17 million visits per year, confirmed) | Development + PhilHealth |
 | 3 | Integration adapter framework with a CSMST stub, error queue and endpoint admin screen | Development (CSMST spec: PhilHealth) |
 | 4 | Admin screens for backup status and report templates; incident-response procedure; release procedure | Development |
 | 5 | Configurable approval workflows beyond CMS; self-service password recovery (needs a mail/SMS channel) | Development + PhilHealth |

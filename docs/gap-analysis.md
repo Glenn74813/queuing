@@ -73,7 +73,7 @@ Smaller usability items requested in this session but not built: a bulk "Add all
 
 | # | Spec ref | Gap |
 |---|---|---|
-| B1 | R-11 SLOs | No load or stress test. WebSocket uses Spring's in-memory simple broker, so live updates cannot be shared across several central app instances. Running more than one central node needs a broker relay (RabbitMQ or ActiveMQ) or sticky sessions. Sizing for 112 sites is unproven (OI-01). |
+| B1 | R-11 SLOs | No load or stress test. WebSocket uses Spring's in-memory simple broker, so live updates cannot be shared across several central app instances. Running more than one central node needs a broker relay (RabbitMQ or ActiveMQ) or sticky sessions. Sizing for 112 sites is unproven. Update 2026-10-23: "17 million" is confirmed as client visits per year, not concurrent users; [capacity-plan.md](capacity-plan.md) derives the load and proposes SLOs and a load test plan. |
 | B2 | R-10 | Offline-first sync is tested in integration tests only. There has been no WAN-cut drill between a real site node and central, and no clock-skew test. |
 | B3 | R-2.5 | `backup.sh` and `restore.sh` have never been executed. There has been no restore drill and no RPO/RTO measurement. |
 | B4 | R-2 | Docker Compose has never been run (OI-02). The native installer has only been dry-run. |
