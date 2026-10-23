@@ -65,8 +65,8 @@ body {
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
 }
+/* Headings inherit their colour, so they stay white on dark screens (queue display, sidebar). */
 h1, h2, h3, .h1, .h2, .h3, .h4, .h5, .h6 {
-  color: var(--qms-ink);
   letter-spacing: -0.011em;
 }
 .tabular, .table td.text-end, .table th.text-end {
@@ -610,19 +610,70 @@ h1, h2, h3, .h1, .h2, .h3, .h4, .h5, .h6 {
 .display-header {
   background: var(--qms-primary);
 }
+.display .board-label {
+  color: #9fc3ad;
+  font-size: clamp(1rem, 1.6vw, 1.6rem);
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin-bottom: 0.75rem;
+}
 .display .now-serving-card {
   background: #143524;
   border-radius: 1rem;
   border: 3px solid transparent;
 }
 .display .now-serving-card .number {
-  font-size: clamp(2.5rem, 6vw, 5.5rem);
-  font-weight: 900;
+  font-size: clamp(2.5rem, 5vw, 4.5rem);
+  font-weight: 800;
   line-height: 1;
+  font-variant-numeric: tabular-nums;
 }
 .display .now-serving-card .counter {
-  font-size: clamp(1.2rem, 2.5vw, 2.2rem);
+  font-size: clamp(1.2rem, 2.2vw, 2rem);
   color: var(--qms-accent);
+}
+/* The latest call: one large, centred card readable from the back of the room. */
+.display .now-serving-card .number,
+.display .now-serving-card .counter {
+  white-space: nowrap;
+}
+/* Sized against both width and height so the whole board fits a TV without scrolling. */
+.display .now-serving-hero {
+  padding: min(3vh, 2.5rem) 1.5rem;
+  text-align: center;
+}
+.display .now-serving-hero .number {
+  font-size: clamp(5rem, min(13vw, 21vh), 15rem);
+  letter-spacing: 0.02em;
+}
+.display .now-serving-hero .proceed {
+  font-size: clamp(1.2rem, min(2.2vw, 3.2vh), 2.4rem);
+  margin-top: 0.5rem;
+}
+.display .now-serving-hero .counter {
+  font-size: clamp(2rem, min(4.5vw, 7vh), 4.5rem);
+  font-weight: 700;
+  line-height: 1.1;
+}
+.display .now-serving-hero .service {
+  color: #b9d3c3;
+  font-size: clamp(0.95rem, min(1.4vw, 2.2vh), 1.4rem);
+  margin-top: 0.25rem;
+}
+/* Other counters serving now: one compact line each. */
+.display .now-serving-mini {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 0.6rem 1.5rem;
+}
+.display .now-serving-mini .number {
+  font-size: clamp(1.8rem, min(3.2vw, 5vh), 3rem);
+}
+.display .now-serving-mini .counter {
+  font-size: clamp(1.1rem, min(2vw, 3vh), 1.8rem);
 }
 .display .clock {
   font-size: 2.5rem;

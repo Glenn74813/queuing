@@ -142,6 +142,9 @@ function DisplayBoardView() {
     else void document.documentElement.requestFullscreen?.();
   };
 
+  // Newest call first (the server sorts by last call); it gets the large card.
+  const [latest, ...others] = board?.nowServing ?? [];
+
   return (
     <div className="display d-flex flex-column">
       <header className="display-header d-flex justify-content-between align-items-center px-4 py-2">
@@ -176,22 +179,33 @@ function DisplayBoardView() {
 
       <div className="flex-grow-1 row g-3 m-0 p-3">
         <section className="col-lg-7" aria-labelledby="now-serving">
-          <h1 id="now-serving" className="h2 text-uppercase mb-3">Now serving</h1>
-          <div className="row g-3">
-            {(board?.nowServing ?? []).map((c) => (
-              <div key={c.ticketId} className="col-sm-6 col-xl-4">
-                <div className={`now-serving-card p-3 text-center ${flashing.has(c.ticketId) ? 'flash' : ''}`}>
-                  <div className="number">{c.displayNumber}</div>
-                  <div className="counter">{c.counterName}</div>
-                  <div className="small text-white-50">{c.serviceName}</div>
+          <h1 id="now-serving" className="board-label text-center">Now serving</h1>
+          {latest ? (
+            <div className={`now-serving-card now-serving-hero ${flashing.has(latest.ticketId) ? 'flash' : ''}`}>
+              <div className="number">{latest.displayNumber}</div>
+              <div className="proceed">Please proceed to</div>
+              <div className="counter">{latest.counterName}</div>
+              <div className="service">{latest.serviceName}</div>
+            </div>
+          ) : (
+            board && <p className="fs-2 text-center text-white-50 py-5">Please wait for your number to be called.</p>
+          )}
+          {others.length > 0 && (
+            <div className="row g-2 mt-1 justify-content-center">
+              {others.slice(0, 6).map((c) => (
+                <div key={c.ticketId} className="col-auto">
+                  <div className={`now-serving-card now-serving-mini ${flashing.has(c.ticketId) ? 'flash' : ''}`}
+                    title={c.serviceName}>
+                    <span className="number">{c.displayNumber}</span>
+                    <span className="counter">{c.counterName}</span>
+                  </div>
                 </div>
-              </div>
-            ))}
-            {board && board.nowServing.length === 0 && <p className="fs-3 text-white-50">Please wait for your number to be called.</p>}
-          </div>
-          <div className="d-flex gap-4 mt-4">
+              ))}
+            </div>
+          )}
+          <div className="d-flex gap-4 mt-3">
             <section className="flex-grow-1" aria-labelledby="recent-h">
-              <h2 id="recent-h" className="h4 text-uppercase">Recent calls</h2>
+              <h2 id="recent-h" className="board-label">Recent calls</h2>
               <ul className="list-unstyled fs-4 mb-0">
                 {(board?.recentCalls ?? []).slice(0, 8).map((c) => (
                   <li key={callKey(c)} className="d-flex justify-content-between border-bottom border-secondary py-1">
@@ -203,7 +217,7 @@ function DisplayBoardView() {
               </ul>
             </section>
             <div className="text-center">
-              <div className="h4 text-uppercase">Waiting</div>
+              <div className="board-label">Waiting</div>
               <div className="display-3 fw-bold">{board?.waitingCount ?? '—'}</div>
             </div>
           </div>
