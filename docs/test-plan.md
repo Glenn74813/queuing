@@ -28,6 +28,16 @@ Each of these needs an environment, hardware or PhilHealth participation.
 | Third-party VAPT | Provider engagement (OI-22) |
 | UAT at representative sites | PhilHealth scheduling |
 
+## Wall-clock time storage — 2026-10-23
+
+`CounterScheduleIT` found that Hibernate shifted `LocalTime` columns by the JVM's time-zone offset
+on write (the configuration sets `hibernate.jdbc.time_zone: UTC`): 08:00–17:00 entered on a JVM in
+Asia/Manila was stored as 00:00–09:00, which the application read back correctly but SQL, other
+nodes and a JVM with another time zone did not (Docker images run the JVM in UTC; native and
+development JVMs may not). Site-service hours had the same mapping. Both now bind `LocalTime`
+directly (`LocalTimeJdbcType`); the test asserts the stored value. Existing databases written by a
+non-UTC JVM must have site-service opening hours re-entered.
+
 ## Docker Compose two-node, offline and restore drill — 2026-10-22
 
 Environment: the production Dockerfiles and `deploy/docker-compose.yml` (unchanged), run as two

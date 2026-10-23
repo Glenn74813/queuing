@@ -19,6 +19,7 @@ import ph.gov.philhealth.qms.common.Ids;
 import ph.gov.philhealth.qms.common.TimeService;
 import ph.gov.philhealth.qms.counter.AgentSession;
 import ph.gov.philhealth.qms.counter.AgentSessionRepository;
+import ph.gov.philhealth.qms.counter.CounterService;
 import ph.gov.philhealth.qms.counter.ServiceCounter;
 import ph.gov.philhealth.qms.counter.ServiceCounterRepository;
 import ph.gov.philhealth.qms.monitoring.QmsMetrics;
@@ -54,12 +55,14 @@ public class QueueService {
     private final AuditService audit;
     private final TimeService time;
     private final QmsMetrics metrics;
+    private final CounterService counterStatus;
 
     public QueueService(TicketRepository tickets, TicketEventRepository events, TicketNumberAllocator numbers,
                         SiteRepository sites, SiteServiceRepository siteServices,
                         PriorityCategoryRepository priorities, ServiceCounterRepository counters,
                         AgentSessionRepository sessions, QueueBroadcaster broadcaster, OutboxService outbox,
-                        AuditService audit, TimeService time, QmsMetrics metrics) {
+                        AuditService audit, TimeService time, QmsMetrics metrics, CounterService counterStatus) {
+        this.counterStatus = counterStatus;
         this.tickets = tickets;
         this.events = events;
         this.numbers = numbers;
@@ -108,7 +111,8 @@ public class QueueService {
         SiteService service = siteServices.findById(siteServiceId)
                 .filter(s -> s.getSiteId().equals(site.getId()))
                 .orElseThrow(() -> ApiException.notFound("Service"));
-        if (!service.isOpenAt(time.businessDate(site.getTimezone()), time.localTime(site.getTimezone()))) {
+        if (!service.isOpenAt(time.businessDate(site.getTimezone()), time.localTime(site.getTimezone()))
+                || !CounterService.servable(service.getId(), counterStatus.listUnchecked(site.getId()))) {
             throw ApiException.conflict("This service is not available at the moment");
         }
         int rank = PriorityCategory.REGULAR_RANK;

@@ -317,6 +317,19 @@ export interface Counter {
   siteServiceIds: string[];
   currentAgent?: { id: string; fullName: string };
   agentStatus?: AgentStatus;
+  /** Weekly opening windows; empty = no schedule (always available). */
+  hours: CounterHours[];
+  /** Evaluated now in the site's time zone. */
+  scheduleState: CounterScheduleState;
+}
+
+export type CounterScheduleState = 'NO_SCHEDULE' | 'OPEN' | 'CLOSED';
+
+/** One opening window; dayOfWeek is ISO (1 = Monday … 7 = Sunday), times are "HH:mm" or "HH:mm:ss". */
+export interface CounterHours {
+  dayOfWeek: number;
+  openTime: string;
+  closeTime: string;
 }
 
 export interface CounterInput {
@@ -324,6 +337,8 @@ export interface CounterInput {
   name: string;
   active: boolean;
   siteServiceIds: string[];
+  /** Omit to keep the current schedule; [] removes it. */
+  hours?: CounterHours[];
 }
 
 export type DeviceType = 'KIOSK' | 'DISPLAY';

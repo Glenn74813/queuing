@@ -237,7 +237,8 @@ public class QueueQueryService {
                 .map(s -> {
                     ServiceLoad load = loads.get(s.getId());
                     return new KioskService(s.getId(), s.getServiceItem().getName(),
-                            s.getServiceItem().getDescription(), s.getPrefix(), s.isOpenAt(today, now),
+                            s.getServiceItem().getDescription(), s.getPrefix(),
+                            s.isOpenAt(today, now) && CounterService.servable(s.getId(), counterList),
                             load != null ? load.waitingCount() : 0, load != null ? load.estimatedWaitMinutes() : 0);
                 }).toList();
         List<KioskPriority> prios = priorities.findAllByOrderByRankAscCodeAsc().stream()

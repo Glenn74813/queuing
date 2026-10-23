@@ -60,7 +60,7 @@ Section numbers refer to the project development prompt or specification.
 | R-5.4 | Agent actions: call, recall, complete, transfer, hold, remove, break, void | `QueueService`, `AgentSessionService`, Agent Console UI | `QueueFlowIT`, `TicketStateMachineTest` | Built+Tested | Pending |
 | R-5.4.1 | Validate action vs state and permissions; record who, when, counter, reason | State machine, `lockForAction`, `ticket_event` | `QueueFlowIT` (event sequence, 403/409 cases) | Built+Tested | Pending |
 | R-5.4.2 | Prevent races and duplicate calls | Row locks, SKIP LOCKED, partial unique indexes | `ConcurrencyIT`, `QueueFlowIT.secondAgentCannotTakeOccupiedCounter` | Built+Tested | Pending |
-| R-5.5 | Counters, eligibility, agent login/logout/break, supervisor intervention, workload and estimated wait | `counter` package, `forceEnd` (Queue Monitor → Close counter), `QueueQueryService` | `QueueFlowIT.agentCannotEndSessionWithTicketAtCounter`; Close counter checked in the portal | Partial: no counter operating schedules; no workload redistribution beyond force-close and transfer | – |
+| R-5.5 | Counters, eligibility, agent login/logout/break, supervisor intervention, workload and estimated wait | `counter` package (weekly opening windows per counter, V13), `forceEnd` (Queue Monitor → Close counter), `QueueQueryService`; kiosks offer a service only while an eligible counter is open or staffed; Queue Monitor availability (scheduled open but unstaffed, staffed outside hours) | `QueueFlowIT.agentCannotEndSessionWithTicketAtCounter`, `CounterScheduleIT`, `counterHours` unit tests; Close counter and hours editor checked in the portal | Built+Tested; no automatic workload rebalancing beyond transfer and close counter | Pending |
 | R-5.6 | Priority categories: senior, PWD, pregnant, others; auditable; minimal PII | `priority_category`; no client PII stored | `QueueFlowIT` (priority served first) | Built+Tested | Blocked (OI-06) |
 
 ## 6–7 Kiosk, display, hardware, CMS
@@ -125,7 +125,7 @@ Section numbers refer to the project development prompt or specification.
 | R-14.1 | Source, migrations, API docs, env templates, build instructions | Repository | – | Built | Pending |
 | R-14.2 | User and administrator manuals, troubleshooting guide | `user-guide.md` (agents, supervisors, administrators, reporting), `operations.md`, `deploy/native/README.md` | Written from the implemented screens; not reviewed by PhilHealth users | Built | Pending |
 | R-14.3 | Architecture and DB diagrams | `architecture.md`, `sync-design.md`, `database.md` (ER diagram, data dictionary) | Diagram cross-checked against the migration SQL; Mermaid not rendered locally | Built | Pending |
-| R-15 | Automated unit/integration/API/frontend tests | 63 backend, 65 frontend, 15 browser end-to-end (Playwright); manual browser smoke test (see test-plan) | Passing | Partial: no load tests, cross-browser runs or third-party security scans (see `test-plan.md`) | – |
+| R-15 | Automated unit/integration/API/frontend tests | 65 backend, 69 frontend, 15 browser end-to-end (Playwright); manual browser smoke test (see test-plan) | Passing | Partial: no load tests, cross-browser runs or third-party security scans (see `test-plan.md`) | – |
 | R-16 | Two-year warranty, 120 man-hours, 24/7 on-call, SLA | – | – | Process (OI-21) | – |
 | R-17 | Training and knowledge transfer | – | – | Process | – |
 | R-18 | Layered code, transactions, server-side validation, central error handling, migrations, health checks | Throughout | Code review | Built | Pending |

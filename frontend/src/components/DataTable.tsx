@@ -43,10 +43,10 @@ export function DataTable<T>({
 }: Props<T>) {
   return (
     <div>
-      <div className="table-responsive">
-        <table className={`table table-striped table-hover align-middle ${small ? 'table-sm' : ''}`}>
+      <div className="table-responsive qms-table">
+        <table className={`table table-hover align-middle ${small ? 'table-sm' : ''}`}>
           {caption && <caption className="visually-hidden">{caption}</caption>}
-          <thead className="table-light">
+          <thead>
             <tr>
               {columns.map((c) => (
                 <th key={c.key} scope="col" className={c.className}>

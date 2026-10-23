@@ -76,6 +76,11 @@ class CatalogIT {
                                 "sortOrder", 5, "estimatedDurationMinutes", 10))))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
         String ssId = siteService.get("id").asText();
+        // Kiosks offer a service only when some counter can serve it.
+        mvc.perform(put("/api/v1/sites/" + site.siteId() + "/counters/" + site.counter1()).header("Authorization", lhioAdmin)
+                        .contentType(MediaType.APPLICATION_JSON).content(data.json(Map.of("code", "C1", "name", "Counter 1",
+                                "active", true, "siteServiceIds", java.util.List.of(site.serviceA(), site.serviceB(), ssId)))))
+                .andExpect(status().isOk());
 
         assertThat(kioskOpen(site, ssId)).isFalse();
         issue(site, ssId).andExpect(status().isConflict());

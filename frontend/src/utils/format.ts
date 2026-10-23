@@ -14,6 +14,25 @@ export function formatTime(iso: string | null | undefined): string {
   return Number.isNaN(d.getTime()) ? EMPTY : d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/** Business date "2026-10-23" as "23 Oct 2026" (no time-zone conversion: it is already a local date). */
+export function formatBusinessDate(date: string | null | undefined): string {
+  const m = date ? /^(\d{4})-(\d{2})-(\d{2})$/.exec(date) : null;
+  return m ? `${Number(m[3])} ${MONTHS[Number(m[2]) - 1]} ${m[1]}` : EMPTY;
+}
+
+/** A from/to pair of business dates, shortened when they share a month or year: "16–23 Oct 2026". */
+export function formatDateRange(from: string, to: string): string {
+  if (from === to) return formatBusinessDate(from);
+  const [fy, fm] = from.split('-');
+  const [ty, tm] = to.split('-');
+  const a = formatBusinessDate(from).split(' ');
+  if (fy === ty && fm === tm) return `${a[0]}–${formatBusinessDate(to)}`;
+  if (fy === ty) return `${a[0]} ${a[1]} – ${formatBusinessDate(to)}`;
+  return `${formatBusinessDate(from)} – ${formatBusinessDate(to)}`;
+}
+
 /** Today's date as yyyy-MM-dd in local time (for date inputs). */
 export function todayIso(offsetDays = 0): string {
   const d = new Date();

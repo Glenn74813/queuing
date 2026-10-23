@@ -26,5 +26,6 @@ test('a newly created site is immediately selectable', async ({ page }) => {
   await expect(selector.locator('option', { hasText: name })).toHaveCount(1);
   await selector.selectOption({ label: `${code} — ${name}` });
   await page.getByRole('link', { name: 'Dashboard' }).click();
-  await expect(page.getByText(`${name} · business date`)).toBeVisible();
+  // Dashboard subtitle: site name and its business date, e.g. "LHIO X · 23 Oct 2026".
+  await expect(page.getByText(new RegExp(`^${name} · \\d{1,2} [A-Z][a-z]{2} \\d{4}$`))).toBeVisible();
 });

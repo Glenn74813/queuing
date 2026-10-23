@@ -61,7 +61,7 @@ export function Layout() {
         </div>
       </nav>
       <div className="flex-grow-1 d-flex flex-column min-vw-0" style={{ minWidth: 0 }}>
-        <header className="d-flex flex-wrap align-items-center justify-content-between gap-2 px-3 py-2 border-bottom bg-body-tertiary">
+        <header className="qms-topbar d-flex flex-wrap align-items-center justify-content-between gap-2 px-3 px-lg-4 py-2 border-bottom">
           <SiteSelector />
           <div className="d-flex align-items-center gap-2">
             <span className="small">
@@ -75,7 +75,7 @@ export function Layout() {
             </button>
           </div>
         </header>
-        <main id="main" className="p-3 flex-grow-1" tabIndex={-1}>
+        <main id="main" className="qms-main p-3 p-lg-4 flex-grow-1" tabIndex={-1}>
           <Outlet />
           <IdleSignOut />
         </main>

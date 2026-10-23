@@ -40,6 +40,276 @@
   --bs-nav-pills-link-active-bg: var(--qms-primary);
 }
 
+/* ---------- Typography and surfaces ----------
+ * Inter (self-hosted, @fontsource-variable/inter) with a restrained scale: page title 24px,
+ * section titles 17px, body 15px, labels and table headers 12px uppercase. Numbers use tabular
+ * figures so columns and KPI values line up. Content sits on white surfaces over a light canvas. */
+:root {
+  --qms-ink: #17211b;
+  --qms-ink-2: #46524b;
+  --qms-muted: #6b766f;
+  --qms-border: #e2e7e4;
+  --qms-canvas: #f4f6f5;
+  --qms-surface: #ffffff;
+  --qms-radius: 10px;
+  --qms-shadow: 0 1px 2px rgba(16, 24, 20, 0.05);
+  --bs-body-font-family: 'Inter Variable', 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --bs-body-font-size: 0.9375rem;
+  --bs-body-color: var(--qms-ink);
+  --bs-secondary-color: var(--qms-muted);
+  --bs-border-color: var(--qms-border);
+}
+body {
+  font-feature-settings: 'cv11', 'ss01';
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+h1, h2, h3, .h1, .h2, .h3, .h4, .h5, .h6 {
+  color: var(--qms-ink);
+  letter-spacing: -0.011em;
+}
+.tabular, .table td.text-end, .table th.text-end {
+  font-variant-numeric: tabular-nums;
+}
+.qms-main {
+  background: var(--qms-canvas);
+}
+.qms-topbar {
+  background: var(--qms-surface);
+}
+
+.page-header {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 0.75rem 1rem;
+  margin-bottom: 1.25rem;
+}
+.page-title {
+  font-size: 1.5rem;
+  font-weight: 650;
+  line-height: 1.25;
+  margin: 0;
+}
+.page-subtitle {
+  color: var(--qms-muted);
+  font-size: 0.875rem;
+  margin-top: 0.125rem;
+}
+
+.section {
+  margin-bottom: 1.75rem;
+}
+.section-header {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 0.5rem 1rem;
+  margin-bottom: 0.75rem;
+}
+.section-title {
+  font-size: 1.0625rem;
+  font-weight: 600;
+  margin: 0;
+}
+.section-desc {
+  color: var(--qms-muted);
+  font-size: 0.8125rem;
+  margin: 0.125rem 0 0;
+}
+.footnote {
+  color: var(--qms-muted);
+  font-size: 0.75rem;
+  margin: 0.75rem 0 0;
+}
+
+.surface {
+  background: var(--qms-surface);
+  border: 1px solid var(--qms-border);
+  border-radius: var(--qms-radius);
+  box-shadow: var(--qms-shadow);
+}
+.surface-body {
+  padding: 1.25rem;
+}
+
+/* Inline facts separated by thin dots, e.g. "2 sites · Today · Updated 09:12". */
+.meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0;
+  color: var(--qms-muted);
+  font-size: 0.8125rem;
+  margin-bottom: 1rem;
+}
+.meta-row > * + *::before {
+  content: '';
+  display: inline-block;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.6;
+  margin: 0 0.6rem;
+  vertical-align: middle;
+}
+.meta-row strong {
+  color: var(--qms-ink-2);
+  font-weight: 600;
+}
+
+/* KPI tiles */
+.kpi {
+  height: 100%;
+  padding: 1rem 1.25rem;
+}
+.kpi-label {
+  color: var(--qms-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.kpi-value {
+  font-size: 1.875rem;
+  font-weight: 650;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  margin-top: 0.375rem;
+  font-variant-numeric: tabular-nums;
+}
+.kpi-unit {
+  color: var(--qms-muted);
+  font-size: 0.875rem;
+  font-weight: 500;
+  letter-spacing: 0;
+  margin-left: 0.25rem;
+}
+.kpi-caption {
+  color: var(--qms-muted);
+  font-size: 0.75rem;
+  margin-top: 0.25rem;
+}
+
+/* Tables: quiet uppercase headers, row hover instead of zebra stripes, white surface. */
+.qms-table {
+  background: var(--qms-surface);
+  border: 1px solid var(--qms-border);
+  border-radius: var(--qms-radius);
+  box-shadow: var(--qms-shadow);
+  overflow: hidden;
+}
+.qms-table .table {
+  margin-bottom: 0;
+  --bs-table-hover-bg: #f6f9f7;
+}
+.qms-table .table > thead > tr > th {
+  background: #f8faf9;
+  color: var(--qms-muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--qms-border);
+  padding: 0.6rem 0.85rem;
+}
+.qms-table .table > tbody > tr > td {
+  font-size: 0.875rem;
+  padding: 0.65rem 0.85rem;
+  border-color: #eef1ef;
+}
+.qms-table .table > tbody > tr:last-child > td {
+  border-bottom: 0;
+}
+.qms-table + nav {
+  margin-top: 0.75rem;
+}
+
+/* Segmented controls (period, chart type, scope) */
+.segmented .btn {
+  font-weight: 500;
+}
+.link-strong,
+.btn.link-strong {
+  color: var(--qms-ink);
+  font-size: inherit;
+  font-weight: 600;
+  text-decoration: none;
+  border: 0;
+}
+.link-strong:hover {
+  color: var(--qms-primary-dark);
+  text-decoration: underline;
+}
+.code-tag {
+  display: inline-block;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--qms-ink-2);
+  background: #eef2ef;
+  border-radius: 4px;
+  padding: 0.1rem 0.35rem;
+  margin-right: 0.5rem;
+  vertical-align: 0.08em;
+}
+.empty-state {
+  color: var(--qms-muted);
+  text-align: center;
+  padding: 2rem 1rem;
+}
+.empty-state-title {
+  color: var(--qms-ink-2);
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+}
+.ratio-bar {
+  display: inline-block;
+  width: 56px;
+  height: 6px;
+  border-radius: 3px;
+  background: #e6ebe8;
+  vertical-align: middle;
+  margin-left: 0.5rem;
+  overflow: hidden;
+}
+.ratio-bar > span {
+  display: block;
+  height: 100%;
+  background: var(--qms-primary);
+}
+
+.live-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--qms-muted);
+  background: var(--qms-surface);
+  border: 1px solid var(--qms-border);
+  border-radius: 999px;
+  padding: 0.2rem 0.6rem;
+}
+.live-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #9aa39e;
+}
+.live-pill.is-live {
+  color: var(--qms-primary-dark);
+}
+.live-pill.is-live .live-dot {
+  background: var(--qms-primary);
+  box-shadow: 0 0 0 3px rgba(var(--qms-primary-rgb), 0.18);
+}
+
 /* Strong, visible focus ring for keyboard users. */
 :focus-visible {
   outline: 3px solid var(--qms-accent) !important;

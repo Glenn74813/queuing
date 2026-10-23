@@ -151,8 +151,8 @@ PriorityCategory = { id; code; name; description?; rank: number /*lower = served
 | Method | Path | Notes |
 |---|---|---|
 | GET | `/sites/{siteId}/counters` | `Counter[]` |
-| POST | `/sites/{siteId}/counters` | `{code, name, active, siteServiceIds: string[]}` |
-| PUT | `/sites/{siteId}/counters/{id}` | same |
+| POST | `/sites/{siteId}/counters` | `{code, name, active, siteServiceIds: string[], hours?: CounterHours[]}` |
+| PUT | `/sites/{siteId}/counters/{id}` | same; `hours` omitted keeps the schedule, `[]` removes it. 400 when a window closes before it opens or windows overlap on a day |
 | GET | `/sites/{siteId}/devices` | `Device[]` |
 | POST | `/sites/{siteId}/devices` | `{code, name, type}` → `{device: Device, apiKey: string}` (key shown once) |
 | POST | `/sites/{siteId}/devices/{id}/rotate-key` | → `{device, apiKey}` |
@@ -160,7 +160,11 @@ PriorityCategory = { id; code; name; description?; rank: number /*lower = served
 
 ```ts
 Counter = { id; siteId; code; name; active: boolean; siteServiceIds: string[];
-  currentAgent?: { id; fullName }; agentStatus?: 'AVAILABLE'|'ON_BREAK' }
+  currentAgent?: { id; fullName }; agentStatus?: 'AVAILABLE'|'ON_BREAK';
+  hours: CounterHours[]; scheduleState: 'NO_SCHEDULE'|'OPEN'|'CLOSED' /*now, site time zone*/ }
+CounterHours = { dayOfWeek: 1..7 /*ISO, 1 = Monday*/; openTime: 'HH:mm[:ss]'; closeTime: 'HH:mm[:ss]' }
+// Several windows per day express breaks. A kiosk offers a service (and POST /kiosk/tickets accepts
+// it) only while some active eligible counter is staffed, open by its schedule, or has no schedule.
 Device = { id; siteId; code; name; type: 'KIOSK'|'DISPLAY'; active: boolean; lastSeenAt?: string }
 ```
 

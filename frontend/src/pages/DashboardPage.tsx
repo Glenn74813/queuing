@@ -9,22 +9,29 @@ import { DataTable } from '../components/DataTable';
 import { ErrorAlert } from '../components/ErrorAlert';
 import { LiveIndicator } from '../components/LiveIndicator';
 import { PageHeader } from '../components/PageHeader';
+import { KpiCard, Section } from '../components/Section';
 import { NoSiteNotice } from '../components/SiteSelector';
 import { Spinner } from '../components/Spinner';
 import { useAsync } from '../hooks/useAsync';
 import { useSiteQueue } from '../hooks/useSiteQueue';
+import { formatBusinessDate, formatDateRange } from '../utils/format';
 import { formatMinutes } from '../utils/metrics';
 
-function StatCard({ label, value }: { label: string; value: string | number }) {
+const fmtNum = (n: number) => n.toLocaleString('en-US');
+const pctOf = (part: number, whole: number) => (whole > 0 ? `${Math.round((part / whole) * 100)}% of issued` : undefined);
+
+/** The four headline numbers shared by the national and site views. */
+function TodayKpis({ issued, completed, waiting, avgWait, label }: {
+  issued: number; completed: number; waiting: number; avgWait: number | null | undefined; label: string;
+}) {
+  const avg = formatMinutes(avgWait);
   return (
-    <div className="col-6 col-lg-3">
-      <div className="card stat-card h-100">
-        <div className="card-body">
-          <div className="text-body-secondary small">{label}</div>
-          <div className="value">{value}</div>
-        </div>
-      </div>
-    </div>
+    <section className="row g-3 mb-4" aria-label={label}>
+      <KpiCard label="Tickets issued" value={fmtNum(issued)} caption="Today" />
+      <KpiCard label="Completed" value={fmtNum(completed)} caption={pctOf(completed, issued) ?? 'Today'} />
+      <KpiCard label="Waiting now" value={fmtNum(waiting)} caption="In queue at this moment" />
+      <KpiCard label="Average wait" value={avg} unit="min" caption="Issue to first call, today" />
+    </section>
   );
 }
 
@@ -69,12 +76,14 @@ function ServicesAvailed({ load, refreshKey }: {
   const volume = useAsync(() => load(days), [days, refreshKey]);
   const v = volume.data;
   const total = v?.services.reduce((n, s) => n + s.issued, 0) ?? 0;
+  const unused = v?.services.filter((s) => s.issued === 0).length ?? 0;
+  const periodLabel = PERIODS.find((p) => p.days === days)?.label.toLowerCase();
   return (
-    <section aria-labelledby="availed-heading" className="mb-4">
-      <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
-        <h2 id="availed-heading" className="h5 mb-0">Services availed</h2>
-        <div className="d-flex align-items-center gap-3">
-          <div className="btn-group btn-group-sm" role="group" aria-label="Period">
+    <Section id="availed-heading" title="Services availed"
+      description={v ? `${formatDateRange(v.from, v.to)} · ${fmtNum(total)} client${total === 1 ? '' : 's'} across ${v.services.length} services` : undefined}
+      actions={(
+        <>
+          <div className="btn-group btn-group-sm segmented" role="group" aria-label="Period">
             {PERIODS.map((p) => (
               <button key={p.days} type="button" className={`btn ${days === p.days ? 'btn-primary' : 'btn-outline-primary'}`}
                 aria-pressed={days === p.days} onClick={() => setDays(p.days)}>
@@ -82,7 +91,7 @@ function ServicesAvailed({ load, refreshKey }: {
               </button>
             ))}
           </div>
-          <div className="btn-group btn-group-sm" role="group" aria-label="Chart type">
+          <div className="btn-group btn-group-sm segmented" role="group" aria-label="Chart type">
             {(['pie', 'bars', 'table'] as View[]).map((k) => (
               <button key={k} type="button" className={`btn ${view === k ? 'btn-secondary' : 'btn-outline-secondary'}`}
                 aria-pressed={view === k} onClick={() => setView(k)}>
@@ -90,15 +99,9 @@ function ServicesAvailed({ load, refreshKey }: {
               </button>
             ))}
           </div>
-        </div>
-      </div>
+        </>
+      )}>
       <ErrorAlert error={volume.error} />
-      {v && (
-        <p className="small text-body-secondary mb-2">
-          {v.from === v.to ? v.from : `${v.from} to ${v.to}`} · {total.toLocaleString('en-US')} clients across{' '}
-          {v.services.length} services · counted by the service chosen at the kiosk; voided tickets excluded
-        </p>
-      )}
       {v && (view === 'table' ? (
         <DataTable caption="Clients per service" rows={v.services} rowKey={(s) => s.siteServiceId}
           columns={[
@@ -109,27 +112,33 @@ function ServicesAvailed({ load, refreshKey }: {
             { key: 'abandoned', header: 'Abandoned', className: 'text-end' },
           ]} />
       ) : view === 'pie' ? (
-        <div className="card card-body">
-          <PieChart title={`Share of clients by service — ${PERIODS.find((p) => p.days === days)?.label.toLowerCase()}`}
-            unit="clients" slices={toPieSlices(v.services)} />
-          {v.services.filter((s) => s.issued === 0).length > 0 && (
-            <p className="small text-body-secondary mb-0 mt-2">
-              {v.services.filter((s) => s.issued === 0).length} offered service(s) had no clients; see Bars or Table.
-            </p>
+        <div className="surface surface-body">
+          {total === 0 ? (
+            <div className="empty-state" role="status">
+              <div className="empty-state-title">No clients {days === 1 ? 'yet today' : `in the ${periodLabel}`}</div>
+              <div className="small">The share of clients per service appears here as tickets are issued at the kiosks.</div>
+            </div>
+          ) : (
+            <PieChart title={`Share of clients by service — ${periodLabel}`} unit="clients" slices={toPieSlices(v.services)} />
           )}
+          <p className="footnote">
+            Counted by the service chosen at the kiosk; voided tickets are excluded.
+            {total > 0 && unused > 0 && ` ${unused} offered service${unused === 1 ? '' : 's'} had no clients (see Bars or Table).`}
+          </p>
         </div>
       ) : (
-        <div className="card card-body">
-          <BarChart title={`Clients per service — ${PERIODS.find((p) => p.days === days)?.label.toLowerCase()}`} unit="clients"
+        <div className="surface surface-body">
+          <BarChart title={`Clients per service — ${periodLabel}`} unit="clients"
             data={v.services.map((s) => ({
               key: s.siteServiceId,
               label: s.serviceName,
               value: s.issued,
               detail: `${s.served} served · ${s.waiting} in queue · ${s.abandoned} abandoned`,
             }))} />
+          <p className="footnote">Counted by the service chosen at the kiosk; voided tickets are excluded.</p>
         </div>
       ))}
-    </section>
+    </Section>
   );
 }
 
@@ -153,40 +162,48 @@ function AllSitesDashboard({ onOpenSite }: { onOpenSite: (siteId: string) => voi
   }, []);
   const overview = useAsync(() => queueApi.overview(1), [tick]);
   const o = overview.data;
+  const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
+  useEffect(() => {
+    if (o) setUpdatedAt(new Date());
+  }, [o]);
   return (
     <>
       <ErrorAlert error={overview.error} />
       {overview.loading && !o && <Spinner />}
       {o && (
         <>
-          <p className="small text-body-secondary">
-            {o.national ? 'All sites nationwide' : 'All sites in your scope'} · {o.siteCount} site{o.siteCount === 1 ? '' : 's'} ·
-            today at each site · refreshes every 30 seconds
-          </p>
-          <section className="row g-3 mb-4" aria-label="Today's statistics, all sites">
-            <StatCard label="Issued today" value={o.totals.issuedToday} />
-            <StatCard label="Completed today" value={o.totals.completedToday} />
-            <StatCard label="Waiting now" value={o.totals.waitingCount} />
-            <StatCard label="Avg wait today (min)" value={formatMinutes(o.totals.avgWaitMinutesToday)} />
-          </section>
+          <div className="meta-row">
+            <span><strong>{o.national ? 'All sites nationwide' : 'All sites in your scope'}</strong></span>
+            <span>{o.siteCount} site{o.siteCount === 1 ? '' : 's'}</span>
+            <span>Today, each site's local date</span>
+            {updatedAt && <span>Updated {updatedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}, refreshes every 30 s</span>}
+          </div>
+          <TodayKpis label="Today's statistics, all sites" issued={o.totals.issuedToday} completed={o.totals.completedToday}
+            waiting={o.totals.waitingCount} avgWait={o.totals.avgWaitMinutesToday} />
           <ServicesAvailed refreshKey={`all:${tick}`} load={(days) => queueApi.overview(days).then(fromCatalog)} />
-          <section aria-labelledby="sites-heading">
-            <h2 id="sites-heading" className="h5">Sites</h2>
+          <Section id="sites-heading" title="Sites" description="Today at each site. Select a site to open its live view.">
             <DataTable caption="Today by site" rows={o.sites} rowKey={(s) => s.siteId}
               columns={[
-                { key: 'siteName', header: 'Site', render: (s) => (
-                  <button type="button" className="btn btn-link p-0 text-start" onClick={() => onOpenSite(s.siteId)}>
-                    {s.siteCode} — {s.siteName}
+                { key: 'siteName', header: 'Site', className: 'text-nowrap', render: (s) => (
+                  <button type="button" className="btn btn-link p-0 text-start link-strong" onClick={() => onOpenSite(s.siteId)}>
+                    <span className="code-tag">{s.siteCode}</span>{s.siteName}
                   </button>
                 ) },
-                { key: 'regionName', header: 'Region' },
-                { key: 'issuedToday', header: 'Issued today', className: 'text-end' },
-                { key: 'completedToday', header: 'Completed', className: 'text-end' },
-                { key: 'waitingNow', header: 'Waiting now', className: 'text-end' },
+                { key: 'regionName', header: 'Region', className: 'text-nowrap text-body-secondary' },
+                { key: 'issuedToday', header: 'Issued', className: 'text-end', render: (s) => fmtNum(s.issuedToday) },
+                { key: 'completedToday', header: 'Completed', className: 'text-end', render: (s) => fmtNum(s.completedToday) },
+                { key: 'waitingNow', header: 'Waiting', className: 'text-end', render: (s) => fmtNum(s.waitingNow) },
                 { key: 'avgWaitMinutesToday', header: 'Avg wait (min)', className: 'text-end', render: (s) => formatMinutes(s.avgWaitMinutesToday) },
-                { key: 'counters', header: 'Counters staffed', className: 'text-end', render: (s) => `${s.countersStaffed} / ${s.countersTotal}` },
+                { key: 'counters', header: 'Counters staffed', className: 'text-end text-nowrap', render: (s) => (
+                  <>
+                    {s.countersStaffed} of {s.countersTotal}
+                    <span className="ratio-bar" aria-hidden="true">
+                      <span style={{ width: `${s.countersTotal > 0 ? (s.countersStaffed / s.countersTotal) * 100 : 0}%` }} />
+                    </span>
+                  </>
+                ) },
               ]} />
-          </section>
+          </Section>
         </>
       )}
     </>
@@ -229,7 +246,7 @@ export function DashboardPage() {
   const { data, error, loading, connected } = useSiteQueue(showAll ? null : siteId);
 
   const scopeSwitch = multiSite && (
-    <div className="btn-group btn-group-sm" role="group" aria-label="Dashboard scope">
+    <div className="btn-group btn-group-sm segmented" role="group" aria-label="Dashboard scope">
       <button type="button" className={`btn ${showAll ? 'btn-primary' : 'btn-outline-primary'}`} aria-pressed={showAll}
         onClick={() => setScope('all')}>
         {isNational ? 'All sites (national)' : 'All my sites'}
@@ -255,25 +272,18 @@ export function DashboardPage() {
     <>
       <PageHeader
         title="Dashboard"
-        subtitle={site ? `${site.name}${data ? ` · business date ${data.businessDate}` : ''}` : undefined}
+        subtitle={site ? `${site.name}${data ? ` · ${formatBusinessDate(data.businessDate)}` : ''}` : undefined}
         actions={<div className="d-flex align-items-center gap-2">{scopeSwitch}<LiveIndicator connected={connected} /></div>}
       />
       <ErrorAlert error={error} />
       {loading && !data && <Spinner />}
       {data && (
         <>
-          <section className="row g-3 mb-4" aria-label="Today's statistics">
-            <StatCard label="Issued today" value={data.stats.issuedToday} />
-            <StatCard label="Completed today" value={data.stats.completedToday} />
-            <StatCard label="Waiting now" value={data.stats.waitingCount} />
-            <StatCard label="Avg wait today (min)" value={formatMinutes(data.stats.avgWaitMinutesToday)} />
-          </section>
+          <TodayKpis label="Today's statistics" issued={data.stats.issuedToday} completed={data.stats.completedToday}
+            waiting={data.stats.waitingCount} avgWait={data.stats.avgWaitMinutesToday} />
           <ServicesAvailed refreshKey={`${siteId}:${data.stats.issuedToday}:${data.stats.completedToday}`}
             load={(days) => queueApi.serviceVolume(siteId, days)} />
-          <section aria-labelledby="svc-heading">
-            <h2 id="svc-heading" className="h5">
-              Waiting by service
-            </h2>
+          <Section id="svc-heading" title="Waiting by service" description="Clients in each line now and the estimated wait for a new ticket.">
             <DataTable
               caption="Waiting tickets per service"
               rows={data.services}
@@ -289,16 +299,14 @@ export function DashboardPage() {
                 },
               ]}
             />
-          </section>
-          <section aria-labelledby="ctr-heading" className="mt-4">
-            <h2 id="ctr-heading" className="h5">
-              Counters
-            </h2>
-            <p className="mb-0">
-              {data.counters.filter((c) => c.currentAgent).length} of {data.counters.length} counters staffed ·{' '}
-              {data.called.length} being served · {data.held.length} on hold
-            </p>
-          </section>
+          </Section>
+          <Section id="ctr-heading" title="Counters">
+            <div className="row g-3">
+              <KpiCard label="Staffed" value={`${data.counters.filter((c) => c.currentAgent).length} of ${data.counters.length}`} caption="Counters with an agent signed in" />
+              <KpiCard label="Being served" value={fmtNum(data.called.length)} caption="Clients at a counter now" />
+              <KpiCard label="On hold" value={fmtNum(data.held.length)} caption="Waiting for documents or a return" />
+            </div>
+          </Section>
         </>
       )}
     </>

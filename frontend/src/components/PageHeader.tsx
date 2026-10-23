@@ -8,12 +8,12 @@ interface Props {
 
 export function PageHeader({ title, subtitle, actions }: Props) {
   return (
-    <header className="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3 pb-2 border-bottom">
+    <header className="page-header">
       <div>
-        <h1 className="h3 mb-0">{title}</h1>
-        {subtitle && <div className="text-body-secondary small">{subtitle}</div>}
+        <h1 className="page-title">{title}</h1>
+        {subtitle && <div className="page-subtitle">{subtitle}</div>}
       </div>
-      {actions && <div className="d-flex flex-wrap gap-2">{actions}</div>}
+      {actions && <div className="d-flex flex-wrap align-items-center gap-2">{actions}</div>}
     </header>
   );
 }

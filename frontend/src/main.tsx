@@ -1,3 +1,4 @@
+import '@fontsource-variable/inter';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './styles.css';
 import { StrictMode } from 'react';

@@ -33,6 +33,13 @@ Closed on 2026-10-22, all with automated tests:
 | E1, E2 | RTM rows for tests, numbering, e-ticket, sessions, monitoring and retention updated; the WebSocket single-node limit is noted under R-11.1. |
 | (extra) | Site Services › **Add all catalog services**. |
 
+Closed on 2026-10-23:
+
+| Item | What was built |
+|---|---|
+| A1 | Weekly opening hours per counter, with several windows a day for breaks. Kiosks stop ticketing a service when no eligible counter is open or staffed. Queue Monitor shows "Scheduled open, no agent" and "Staffed outside hours". Automatic workload rebalancing is still open. |
+| (found) | Hibernate stored `LocalTime` values shifted by the JVM's time-zone offset (`hibernate.jdbc.time_zone: UTC` on a JVM in Manila time), so site-service hours were saved 8 hours off on non-UTC JVMs. Fixed with direct binding; databases written by a non-UTC JVM need their site-service hours re-entered. |
+
 Verified on 2026-10-22 with a Docker Compose two-node drill (details in test-plan.md):
 
 | Item | Result |

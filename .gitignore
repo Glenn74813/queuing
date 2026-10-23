@@ -11,3 +11,4 @@ data/
 # local preview launcher (points at a machine-specific script)
 .claude/launch.json
 .drill/
+.local/

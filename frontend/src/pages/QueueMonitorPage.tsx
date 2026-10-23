@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { countersApi } from '../api/counters';
 import type { Counter, Ticket } from '../api/types';
+import { counterSituation, formatHours } from '../utils/counterHours';
 import { useAuth } from '../auth/AuthContext';
 import { useSite } from '../auth/SiteContext';
 import { DataTable, type Column } from '../components/DataTable';
@@ -64,6 +65,15 @@ export function QueueMonitorPage() {
               { key: 'name', header: 'Counter', render: (c) => `${c.name} (${c.code})` },
               { key: 'agent', header: 'Agent', render: (c) => c.currentAgent?.fullName ?? <span className="text-body-secondary">Unstaffed</span> },
               { key: 'agentStatus', header: 'Status', render: (c) => (c.currentAgent ? <StatusBadge status={c.agentStatus} /> : '—') },
+              { key: 'schedule', header: 'Availability', render: (c) => {
+                const st = counterSituation(c);
+                return (
+                  <>
+                    <span className={`badge text-bg-${st.tone}`}>{st.label}</span>
+                    {c.hours.length > 0 && <div className="small text-body-secondary">{formatHours(c.hours)}</div>}
+                  </>
+                );
+              } },
               { key: 'serving', header: 'Serving', render: (c) => data?.called.find((t) => t.counterId === c.id)?.displayNumber ?? '—' },
               ...(can('QUEUE_SUPERVISE') ? [{
                 key: 'close', header: <span className="visually-hidden">Actions</span>, className: 'text-end',

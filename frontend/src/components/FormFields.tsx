@@ -100,14 +100,17 @@ interface CheckProps {
   checked: boolean;
   onChange: (checked: boolean) => void;
   className?: string;
+  hint?: ReactNode;
 }
 
-export function CheckField({ label, checked, onChange, className = 'mb-3' }: CheckProps) {
+export function CheckField({ label, checked, onChange, className = 'mb-3', hint }: CheckProps) {
   const id = useId();
   return (
     <div className={`form-check ${className}`}>
-      <input id={id} type="checkbox" className="form-check-input" checked={checked} onChange={(e) => onChange(e.target.checked)} />
+      <input id={id} type="checkbox" className="form-check-input" checked={checked} onChange={(e) => onChange(e.target.checked)}
+        aria-describedby={hint ? `${id}-hint` : undefined} />
       <label htmlFor={id} className="form-check-label">{label}</label>
+      {hint && <div id={`${id}-hint`} className="form-text">{hint}</div>}
     </div>
   );
 }

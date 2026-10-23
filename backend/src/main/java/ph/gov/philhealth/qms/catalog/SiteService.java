@@ -11,6 +11,8 @@ import java.time.LocalTime;
 import java.util.UUID;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.JdbcType;
+import org.hibernate.type.descriptor.jdbc.LocalTimeJdbcType;
 import ph.gov.philhealth.qms.common.BaseEntity;
 
 /** A catalog service offered at one site, with site-specific prefix, ordering and hours. */
@@ -31,7 +33,9 @@ public class SiteService extends BaseEntity {
     private boolean active = true;
     private int sortOrder;
     private int estimatedDurationMinutes;
+    @JdbcType(LocalTimeJdbcType.class)   // wall-clock time: no JVM/UTC time-zone shift
     private LocalTime openTime;
+    @JdbcType(LocalTimeJdbcType.class)
     private LocalTime closeTime;
     /** Default next stage of a multi-stage flow at the same site (null = last stage). */
     private UUID nextSiteServiceId;
